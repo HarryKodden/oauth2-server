@@ -102,8 +102,12 @@ func (f *AuthorizationCodeFlow) showLoginFormWithError(w http.ResponseWriter, r 
         query = "?" + query
     }
 
-    loginHTML := fmt.Sprintf(`
-<!DOCTYPE html>
+    errorHTML := ""
+    if errorMsg != "" {
+        errorHTML = fmt.Sprintf(`<div class="error">❌ %s</div>`, errorMsg)
+    }
+
+    loginHTML := `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -114,8 +118,8 @@ func (f *AuthorizationCodeFlow) showLoginFormWithError(w http.ResponseWriter, r 
         .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"], input[type="password"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        .btn { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
+        input[type="text"], input[type="password"] { width: 100%%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .btn { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%%; }
         .btn:hover { background-color: #0056b3; }
         .info { background-color: #e7f3ff; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
         .error { background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb; }
@@ -128,14 +132,14 @@ func (f *AuthorizationCodeFlow) showLoginFormWithError(w http.ResponseWriter, r 
 <body>
     <div class="container">
         <h2>🔐 OAuth2 Login</h2>
-        %s
+        ` + errorHTML + `
         <div class="info">
-            <strong>Client:</strong> %s<br>
-            <strong>Scopes:</strong> %s<br>
-            <strong>Redirect URI:</strong> %s
+            <strong>Client:</strong> ` + ar.GetClient().GetID() + `<br>
+            <strong>Scopes:</strong> ` + strings.Join(ar.GetRequestedScopes(), ", ") + `<br>
+            <strong>Redirect URI:</strong> ` + ar.GetRedirectURI().String() + `
         </div>
         
-        <form method="post" action="/auth%s">
+        <form method="post" action="/auth` + query + `">
             <input type="hidden" name="action" value="login">
             <div class="form-group">
                 <label for="username">Username:</label>
@@ -150,23 +154,11 @@ func (f *AuthorizationCodeFlow) showLoginFormWithError(w http.ResponseWriter, r 
 
         <div class="test-users">
             <h4>Available Test Users:</h4>
-            <ul>%s</ul>
+            <ul>` + f.generateTestUsersList() + `</ul>
         </div>
     </div>
 </body>
-</html>`,
-        func() string {
-            if errorMsg != "" {
-                return fmt.Sprintf(`<div class="error">❌ %s</div>`, errorMsg)
-            }
-            return ""
-        }(),
-        ar.GetClient().GetID(),
-        strings.Join(ar.GetRequestedScopes(), ", "),
-        ar.GetRedirectURI().String(),
-        query,
-        f.generateTestUsersList(),
-    )
+</html>`
 
     w.Header().Set("Content-Type", "text/html; charset=utf-8")
     w.WriteHeader(http.StatusOK)

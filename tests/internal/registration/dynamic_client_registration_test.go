@@ -225,7 +225,7 @@ func RegisterClient(request *ClientRegistrationRequest, clientStore *store.Clien
 	// Store the client
 	storeClient := &store.Client{
 		ID:           clientID,
-		HashedSecret: []byte(clientSecret), // Fix: convert string to []byte
+		Secret:       []byte(clientSecret), // Fix: convert string to []byte
 		RedirectURIs: redirectURIs,
 		GrantTypes:   grantTypes,
 		ResponseTypes: responseTypes,

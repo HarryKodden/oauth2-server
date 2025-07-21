@@ -601,7 +601,7 @@ func (h *TokenHandlers) validateAudience(clientID, audience string) bool {
 
 	// Use type switch to handle different client types
 	switch c := client.(type) {
-	case interface{ GetAudience() []string }:
+	case interface{ GetAudience() fosite.Arguments }:
 		for _, aud := range c.GetAudience() {
 			if aud == audience {
 				return true

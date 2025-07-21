@@ -81,7 +81,14 @@ func SplitScopes(scopes string) []string {
 
 // JoinScopes joins individual scopes into a space-separated string
 func JoinScopes(scopes []string) string {
-	return strings.Join(scopes, " ")
+	// Filter out empty strings
+	var filtered []string
+	for _, scope := range scopes {
+		if scope != "" {
+			filtered = append(filtered, scope)
+		}
+	}
+	return strings.Join(filtered, " ")
 }
 
 // NormalizeScope normalizes a scope string by removing duplicates and sorting

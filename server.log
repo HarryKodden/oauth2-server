@@ -55,3 +55,23 @@ time="2025-07-22T00:19:31+02:00" level=info msg="🚀 Starting OAuth2 Server..."
 2025/07/22 00:20:06 ✅ Token exchange completed for client: backend-client, user: 
 {"level":"info","msg":"🔄 Proxy-aware request: GET /userinfo (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:20:06+02:00"}
 {"level":"info","msg":"🔄 Proxy-aware request: GET /.well-known/openid_configuration (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:20:06+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /device (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:00+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /favicon.ico (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:01+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET / (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:04+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /favicon.ico (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:04+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /client1/auth (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:07+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /auth?client_id=frontend-app\u0026redirect_uri=http://localhost:8080/client1/callback\u0026response_type=code\u0026scope=openid+profile+email\u0026state=random-state (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:07+02:00"}
+2025/07/22 00:22:07 🔄 Authorization request: GET /auth?client_id=frontend-app&redirect_uri=http://localhost:8080/client1/callback&response_type=code&scope=openid+profile+email&state=random-state
+2025/07/22 00:22:07 🔍 Query parameters: map[client_id:[frontend-app] redirect_uri:[http://localhost:8080/client1/callback] response_type:[code] scope:[openid profile email] state:[random-state]]
+2025/07/22 00:22:07 ✅ Authorization request created successfully for client: frontend-app
+{"level":"info","msg":"🔄 Proxy-aware request: GET /favicon.ico (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:07+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /favicon.ico (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:17+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET / (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:19+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /favicon.ico (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:19+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /client1/auth (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:21+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /auth?client_id=frontend-app\u0026redirect_uri=http://localhost:8080/client1/callback\u0026response_type=code\u0026scope=openid+profile+email\u0026state=random-state (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:21+02:00"}
+2025/07/22 00:22:21 🔄 Authorization request: GET /auth?client_id=frontend-app&redirect_uri=http://localhost:8080/client1/callback&response_type=code&scope=openid+profile+email&state=random-state
+2025/07/22 00:22:21 🔍 Query parameters: map[client_id:[frontend-app] redirect_uri:[http://localhost:8080/client1/callback] response_type:[code] scope:[openid profile email] state:[random-state]]
+2025/07/22 00:22:21 ✅ Authorization request created successfully for client: frontend-app
+{"level":"info","msg":"🔄 Proxy-aware request: GET /favicon.ico (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:21+02:00"}
+{"level":"info","msg":"🔄 Proxy-aware request: GET /favicon.ico (Original: ://localhost:8080, Forwarded: ://localhost:8080)","time":"2025-07-22T00:22:36+02:00"}
