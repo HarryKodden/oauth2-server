@@ -1,0 +1,162 @@
+# OAuth2 Server Configuration
+
+server:
+  base_url: "http://localhost:8080"
+  port: 8080
+  host: "localhost"
+  read_timeout: 30
+  write_timeout: 30
+  shutdown_timeout: 5
+
+security:
+  jwt_signing_key: "your-secret-key-here"
+  token_expiry_seconds: 3600
+  refresh_token_expiry_seconds: 86400
+  device_code_expiry_seconds: 600
+  enable_pkce: true
+  require_https: false
+
+clients:
+# Frontend SPA Client
+- id: "frontend-app"
+  secret: "frontend-secret"
+  name: "Frontend Application"
+  description: "Main frontend SPA application"
+  redirect_uris:
+  - "http://localhost:8080/client1/callback"
+  - "http://localhost:8080/callback"
+  grant_types:
+  - "authorization_code"
+  - "refresh_token"
+  response_types:
+  - "code"
+  scopes:
+  - "openid"
+  - "profile"
+  - "email"
+  - "api:read"
+  audience:
+  - "api-service"
+  token_endpoint_auth_method: "client_secret_basic"
+  public: false
+  enabled_flows:
+  - "authorization_code"
+  - "refresh_token"
+
+# Backend Service Client
+- id: "backend-service"
+  secret: "backend-secret"
+  name: "Backend Service"
+  description: "Internal backend service for server-to-server communication"
+  redirect_uris: []
+  grant_types:
+  - "client_credentials"
+  - "urn:ietf:params:oauth:grant-type:token-exchange"
+  response_types: []
+  scopes:
+  - "api:read"
+  - "api:write"
+  - "api:admin"
+  audience:
+  - "api-service"
+  token_endpoint_auth_method: "client_secret_basic"
+  public: false
+  enabled_flows:
+  - "client_credentials"
+  - "token_exchange"
+
+# Mobile App Client (Public)
+- id: "mobile-app"
+  name: "Mobile Application"
+  description: "Native mobile application"
+  redirect_uris:
+  - "com.example.app://oauth/callback"
+  grant_types:
+  - "authorization_code"
+  - "refresh_token"
+  response_types:
+  - "code"
+  scopes:
+  - "openid"
+  - "profile"
+  - "email"
+  - "api:read"
+  audience:
+  - "api-service"
+  token_endpoint_auth_method: "none"
+  public: true
+  enabled_flows:
+  - "authorization_code"
+  - "refresh_token"
+  - "device_code"
+
+# Device Flow Client
+- id: "smart-tv-app"
+  secret: "tv-secret"
+  name: "Smart TV Application"
+  description: "Smart TV or IoT device application"
+  redirect_uris: []
+  grant_types:
+  - "urn:ietf:params:oauth:grant-type:device_code"
+  - "refresh_token"
+  response_types: []
+  scopes:
+  - "openid"
+  - "profile"
+  - "api:read"
+  audience:
+  - "api-service"
+  token_endpoint_auth_method: "client_secret_basic"
+  public: false
+  enabled_flows:
+  - "device_code"
+
+users:
+# Test Users
+- id: "user123"
+  username: "john.doe"
+  password: "password123"
+  email: "john.doe@example.com"
+  name: "John Doe"
+  roles:
+  - "user"
+  - "api_user"
+  claims:
+    department: "Engineering"
+    team: "Backend"
+
+- id: "admin456"
+  username: "admin"
+  password: "admin123"
+  email: "admin@example.com"
+  name: "Admin User"
+  roles:
+  - "admin"
+  - "api_admin"
+  claims:
+    department: "IT"
+    team: "Platform"
+
+- id: "service789"
+  username: "service.account"
+  password: "service123"
+  email: "service@example.com"
+  name: "Service Account"
+  roles:
+  - "service"
+  - "api_service"
+
+proxy:
+  trust_headers: true
+  public_base_url: "" # Leave empty to auto-detect
+  force_https: false
+  trusted_proxies:
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
+
+logging:
+  level: "debug"
+  format: "json" # or "json"
+  output_file: "" # Empty for stdout
+  enable_audit: true

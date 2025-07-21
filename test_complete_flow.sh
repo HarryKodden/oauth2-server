@@ -15,7 +15,7 @@ echo ""
 echo "2. Testing Client1 Authorization Flow..."
 
 # Step 1: Get authorization URL for Client1
-AUTH_URL="http://localhost:8080/auth?client_id=frontend-client&redirect_uri=http%3A//localhost%3A8080/callback&response_type=code&scope=openid%20profile%20email%20api%3Aread&state=test123"
+AUTH_URL="http://localhost:8080/auth?client_id=frontend-app&redirect_uri=http%3A//localhost%3A8080/callback&response_type=code&scope=openid%20profile%20email%20api%3Aread&state=test123"
 
 echo "Authorization URL: $AUTH_URL"
 echo ""

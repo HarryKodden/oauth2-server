@@ -1,127 +1,170 @@
-.PHONY: build run test clean help docker-build docker-run deps fmt vet dev demo ci well-known clients
+.PHONY: build run test clean docker-build docker-run test-flow test-integration benchmark coverage-html security tidy check
 
-# Variables
-BINARY_NAME=oauth2-server
-DOCKER_IMAGE=oauth2-server
-PORT=8080
-
-# Default target
-help:
-	@echo "OAuth2 Server with Device Code Flow & Token Exchange"
-	@echo "==================================================="
-	@echo "Available targets:"
-	@echo "  build       - Build the OAuth2 server"
-	@echo "  run         - Run the OAuth2 server"
-	@echo "  test        - Run comprehensive OAuth2 flow tests"
-	@echo "  clean       - Clean build artifacts"
-	@echo "  docker-build - Build Docker image"
-	@echo "  docker-run  - Run server in Docker container"
-	@echo "  deps        - Install dependencies"
-	@echo "  fmt         - Format Go code"
-	@echo "  vet         - Run go vet"
-	@echo "  dev         - Development build (fmt + vet + build)"
-	@echo "  demo        - Start server and open web interface"
-	@echo "  well-known  - Show OAuth2 well-known configuration"
-	@echo "  clients     - Show registered client information"
-
-# Build the OAuth2 server
+# Build the application
 build:
-	@echo "Building $(BINARY_NAME)..."
-	@go build -o $(BINARY_NAME) .
+	@echo "🔨 Building OAuth2 server..."
+	@mkdir -p bin
+	go build -ldflags "-s -w" -o bin/oauth2-server cmd/server/main.go
+	@echo "✅ Build completed: bin/oauth2-server"
 
-# Run the OAuth2 server
+# Check for compilation errors without building
+check:
+	@echo "🔍 Checking for compilation errors..."
+	go build -o /dev/null cmd/server/main.go
+	@echo "✅ No compilation errors found"
+
+# Run the application
 run:
-	@echo "Starting OAuth2 server on port $(PORT)..."
-	@echo "Web interface: http://localhost:$(PORT)"
-	@echo "Well-known config: http://localhost:$(PORT)/.well-known/oauth-authorization-server"
-	@go run .
+	@echo "🚀 Starting OAuth2 server..."
+	go run cmd/server/main.go
 
-# Install dependencies
-deps:
-	@echo "Installing dependencies..."
-	@go mod tidy
-	@go mod download
+# Run with live reload (requires air: go install github.com/cosmtrek/air@latest)
+dev:
+	@echo "🔄 Starting development server with live reload..."
+	air
 
-# Format Go code
-fmt:
-	@echo "Formatting Go code..."
-	@go fmt ./...
-
-# Run go vet
-vet:
-	@echo "Running go vet..."
-	@go vet ./...
-
-# Run comprehensive OAuth2 flow tests
+# Run tests
 test:
-	@echo "Running comprehensive OAuth2 flow tests..."
-	@echo "Testing: Authorization Code, Client Credentials, Refresh Token, Device Code Flow, Token Exchange"
-	@./test_complete_flow.sh
+	@echo "🧪 Running tests..."
+	go test -v ./...
+
+# Run tests with coverage
+test-coverage:
+	@echo "📊 Running tests with coverage..."
+	go test -v -cover ./...
+
+# Tidy dependencies
+tidy:
+	@echo "🧹 Tidying dependencies..."
+	go mod tidy
+	go mod download
 
 # Clean build artifacts
 clean:
-	@echo "Cleaning..."
-	@rm -f $(BINARY_NAME)
-	@go clean
+	@echo "🗑️ Cleaning build artifacts..."
+	rm -rf bin/
+	rm -f coverage.out coverage.html
 
-# Build Docker image
+# Lint code
+lint:
+	@echo "🔍 Linting code..."
+	golangci-lint run
+
+# Format code
+fmt:
+	@echo "✨ Formatting code..."
+	go fmt ./...
+
+# Docker build
 docker-build:
-	@echo "Building Docker image $(DOCKER_IMAGE)..."
-	@docker build -t $(DOCKER_IMAGE) .
+	@echo "🐳 Building Docker image..."
+	docker build -t oauth2-server .
 
-# Run Docker container
-docker-run: docker-build
-	@echo "Running OAuth2 server in Docker container on port $(PORT)..."
-	@echo "Web interface: http://localhost:$(PORT)"
-	@docker run -p $(PORT):$(PORT) $(DOCKER_IMAGE)
+# Docker run
+docker-run:
+	@echo "🐳 Starting Docker containers..."
+	docker-compose up
 
-# Development target - format, vet, and build
-dev: fmt vet build
+# Docker clean
+docker-clean:
+	@echo "🐳 Cleaning Docker containers..."
+	docker-compose down -v
 
-# Demo target - build and run with browser
-demo: build
-	@echo "Starting OAuth2 server demo..."
-	@echo "Server will start on http://localhost:$(PORT)"
-	@echo "Press Ctrl+C to stop"
-	@./$(BINARY_NAME) &
-	@SERVER_PID=$$!; \
-	sleep 2; \
-	echo "Opening web interface..."; \
-	open http://localhost:$(PORT) 2>/dev/null || echo "Visit http://localhost:$(PORT) in your browser"; \
-	echo "Press Enter to stop server"; \
-	read; \
-	kill $$SERVER_PID
+# Run specific test
+test-flow:
+	@echo "🧪 Running flow tests..."
+	go test -v ./internal/flows/...
 
-# CI target - format, vet, build, and test
-ci: fmt vet build
-	@echo "Starting server for CI testing..."
-	@./$(BINARY_NAME) &
-	@SERVER_PID=$$!; \
-	sleep 5; \
-	./test_complete_flow.sh; \
-	TEST_RESULT=$$?; \
-	kill $$SERVER_PID; \
-	exit $$TEST_RESULT
+# Run integration tests
+test-integration:
+	@echo "🧪 Running integration tests..."
+	go test -v -tags=integration ./...
 
-# Show OAuth2 well-known configuration
-well-known:
-	@echo "Fetching OAuth2 well-known configuration..."
-	@curl -s http://localhost:$(PORT)/.well-known/oauth-authorization-server | jq . || echo "Server not running or jq not installed"
+# Benchmark tests
+benchmark:
+	@echo "⚡ Running benchmarks..."
+	go test -bench=. ./...
 
-# Show registered clients information
-clients:
-	@echo "Registered OAuth2 Clients:"
-	@echo "=========================="
-	@echo "Frontend Client (frontend-client):"
-	@echo "  - Grant Types: authorization_code, refresh_token, device_code"
-	@echo "  - Scopes: openid, profile, email, offline_access, api:read"
-	@echo "  - Use Case: User-facing applications, device authorization"
+# Generate test coverage report
+coverage-html:
+	@echo "📈 Generating coverage report..."
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "✅ Coverage report generated: coverage.html"
+
+# Check for security vulnerabilities
+security:
+	@echo "🔒 Checking for security vulnerabilities..."
+	gosec ./...
+
+# Install development dependencies
+install-deps:
+	@echo "📦 Installing development dependencies..."
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+	go install github.com/cosmtrek/air@latest
+
+# Quick check - format, tidy, check compilation
+quick-check: fmt tidy check
+	@echo "✅ Quick check completed"
+
+# Full check - format, tidy, lint, test, security
+full-check: fmt tidy lint test security
+	@echo "✅ Full check completed"
+
+# Build for multiple platforms
+build-all:
+	@echo "🔨 Building for multiple platforms..."
+	@mkdir -p bin
+	GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o bin/oauth2-server-linux-amd64 cmd/server/main.go
+	GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o bin/oauth2-server-darwin-amd64 cmd/server/main.go
+	GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o bin/oauth2-server-darwin-arm64 cmd/server/main.go
+	GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o bin/oauth2-server-windows-amd64.exe cmd/server/main.go
+	@echo "✅ Multi-platform build completed"
+
+# Validate configuration
+validate-config:
+	@echo "🔍 Validating configuration..."
+	go run cmd/server/main.go --validate-config
+	@echo "✅ Configuration is valid"
+
+# Generate example config
+generate-config:
+	@echo "📝 Generating example configuration..."
+	@mkdir -p configs
+	@cp config.yaml configs/config.example.yaml
+	@echo "✅ Example configuration generated: configs/config.example.yaml"
+
+# Show help
+help:
+	@echo "🔐 OAuth2 Server - Available Commands:"
 	@echo ""
-	@echo "Backend Client (backend-client):"
-	@echo "  - Grant Types: client_credentials, token_exchange, refresh_token"
-	@echo "  - Scopes: api:read, api:write"
-	@echo "  - Use Case: Service-to-service communication, long-running processes"
+	@echo "Development:"
+	@echo "  make build       - Build the application"
+	@echo "  make run         - Run the application"
+	@echo "  make dev         - Run with live reload"
+	@echo "  make check       - Check for compilation errors"
 	@echo ""
-	@echo "Test User Credentials:"
-	@echo "  - Username: john.doe"
-	@echo "  - Password: password123"
+	@echo "Testing:"
+	@echo "  make test        - Run all tests"
+	@echo "  make test-coverage - Run tests with coverage"
+	@echo "  make test-flow   - Run flow tests only"
+	@echo "  make benchmark   - Run benchmark tests"
+	@echo ""
+	@echo "Code Quality:"
+	@echo "  make fmt         - Format code"
+	@echo "  make lint        - Lint code"
+	@echo "  make security    - Security scan"
+	@echo "  make quick-check - Format, tidy, check"
+	@echo "  make full-check  - Complete validation"
+	@echo ""
+	@echo "Docker:"
+	@echo "  make docker-build - Build Docker image"
+	@echo "  make docker-run   - Run with Docker Compose"
+	@echo ""
+	@echo "Utilities:"
+	@echo "  make clean       - Clean build artifacts"
+	@echo "  make tidy        - Tidy dependencies"
+	@echo "  make install-deps - Install dev dependencies"
+	@echo "  make validate-config - Validate configuration"
+	@echo "  make generate-config - Generate example configuration"
