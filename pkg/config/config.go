@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"oauth2-server/internal/models"
 	"oauth2-server/internal/utils"
+
 	"gopkg.in/yaml.v2"
 )
 
@@ -49,7 +50,7 @@ type ServerConfig struct {
 
 // SecurityConfig holds security-related configuration
 type SecurityConfig struct {
-	JWTSecret                  string `yaml:"jwt_secret"`
+	JWTSecret                  string `yaml:"jwt_signing_key"`
 	TokenExpirySeconds         int    `yaml:"token_expiry_seconds"`
 	RefreshTokenExpirySeconds  int    `yaml:"refresh_token_expiry_seconds"`
 	DeviceCodeExpirySeconds    int    `yaml:"device_code_expiry_seconds"`
@@ -144,7 +145,10 @@ func NewConfig(configPath ...string) (*Config, error) {
 	if err != nil {
 		// If YAML config fails to load, fall back to defaults but log the error
 		fmt.Printf("⚠️  Failed to load YAML config (%v), using defaults\n", err)
-		config := newDefaultConfig()
+		config, loadErr := Load() // Use the existing Load function for defaults
+		if loadErr != nil {
+			return nil, fmt.Errorf("failed to load default config: %w", loadErr)
+		}
 		config.LoadFromEnv() // Still load environment overrides
 		return config, nil
 	}
@@ -222,73 +226,6 @@ func NewConfig(configPath ...string) (*Config, error) {
 	config.LoadFromEnv()
 
 	return config, nil
-}
-
-// newDefaultConfig creates a default configuration (fallback)
-func newDefaultConfig() *Config {
-	return &Config{
-		Server: ServerConfig{
-			Port:            8080,
-			Host:            "localhost",
-			BaseURL:         "http://localhost:8080",
-			ReadTimeout:     30,
-			WriteTimeout:    30,
-			ShutdownTimeout: 5,
-		},
-		Security: SecurityConfig{
-			JWTSecret:                 "your-secret-key-here",
-			TokenExpirySeconds:        3600,
-			RefreshTokenExpirySeconds: 86400,
-			DeviceCodeExpirySeconds:   600,
-			EnablePKCE:                true,
-			RequireHTTPS:              false,
-		},
-		Logging: LoggingConfig{
-			Level:       "info",
-			Format:      "text",
-			EnableAudit: true,
-		},
-		BaseURL: "http://localhost:8080",
-		Port:    "8080",
-		Host:    "localhost",
-		Clients: []ClientConfig{
-			{
-				ID:                      "frontend-app",
-				Secret:                  "frontend-secret",
-				Name:                    "Frontend Application",
-				RedirectURIs:            []string{"http://localhost:8080/client1/callback"},
-				GrantTypes:              []string{"authorization_code", "refresh_token"},
-				ResponseTypes:           []string{"code"},
-				Scopes:                  []string{"openid", "profile", "email", "api:read"},
-				Audience:                []string{"api-service"},
-				TokenEndpointAuthMethod: "client_secret_basic",
-				Public:                  false,
-				EnabledFlows:            []string{"authorization_code", "refresh_token"},
-			},
-			{
-				ID:            "backend-service",
-				Secret:        "backend-secret",
-				Name:          "Backend Service",
-				RedirectURIs:  []string{},
-				GrantTypes:    []string{"client_credentials", "urn:ietf:params:oauth:grant-type:token-exchange"},
-				ResponseTypes: []string{},
-				Scopes:        []string{"api:read", "api:write"},
-				Audience:      []string{"api-service"},
-				Public:        false,
-				EnabledFlows:  []string{"client_credentials", "token_exchange"},
-			},
-		},
-		Users: []UserConfig{
-			{
-				ID:       "user123",
-				Username: "john.doe",
-				Password: "password123",
-				Email:    "john.doe@example.com",
-				Name:     "John Doe",
-			},
-		},
-		TrustProxyHeaders: true,
-	}
 }
 
 // Validate validates the configuration

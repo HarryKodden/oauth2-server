@@ -1,16 +1,17 @@
 package flows
 
 import (
-    "context"
-    "fmt"
-    "log"
-    "net/http"
-    "strings"
+	"context"
+	"fmt"
+	"log"
+	"net/http"
+	"strings"
 
-    "github.com/ory/fosite"
-    "oauth2-server/internal/auth"
-    "oauth2-server/internal/utils"
-    "oauth2-server/pkg/config"
+	"oauth2-server/internal/auth"
+	"oauth2-server/internal/utils"
+	"oauth2-server/pkg/config"
+
+	"github.com/ory/fosite"
 )
 
 // AuthorizationCodeFlow handles the OAuth2 authorization code flow
@@ -30,6 +31,9 @@ func NewAuthorizationCodeFlow(oauth2Provider fosite.OAuth2Provider, config *conf
 // HandleAuthorization handles the authorization endpoint
 func (f *AuthorizationCodeFlow) HandleAuthorization(w http.ResponseWriter, r *http.Request) {
     ctx := context.Background()
+    
+    log.Printf("🔄 Authorization request: %s %s", r.Method, r.URL.String())
+    log.Printf("🔍 Query parameters: %+v", r.URL.Query())
 
     // Create a new authorization request object and catch any errors
     ar, err := f.oauth2Provider.NewAuthorizeRequest(ctx, r)
@@ -38,6 +42,8 @@ func (f *AuthorizationCodeFlow) HandleAuthorization(w http.ResponseWriter, r *ht
         f.oauth2Provider.WriteAuthorizeError(ctx, w, ar, err)
         return
     }
+    
+    log.Printf("✅ Authorization request created successfully for client: %s", ar.GetClient().GetID())
 
     // Check if this is a login form submission
     if r.Method == "POST" && r.FormValue("action") == "login" {
@@ -100,14 +106,16 @@ func (f *AuthorizationCodeFlow) showLoginFormWithError(w http.ResponseWriter, r 
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OAuth2 Login</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 50px; background-color: #f5f5f5; }
         .container { max-width: 400px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .form-group { margin-bottom: 20px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
-        input[type="text"], input[type="password"] { width: 100%%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        .btn { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%%; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .btn { background-color: #007bff; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; width: 100%; }
         .btn:hover { background-color: #0056b3; }
         .info { background-color: #e7f3ff; padding: 15px; border-radius: 4px; margin-bottom: 20px; }
         .error { background-color: #f8d7da; color: #721c24; padding: 15px; border-radius: 4px; margin-bottom: 20px; border: 1px solid #f5c6cb; }
@@ -160,7 +168,7 @@ func (f *AuthorizationCodeFlow) showLoginFormWithError(w http.ResponseWriter, r 
         f.generateTestUsersList(),
     )
 
-    w.Header().Set("Content-Type", "text/html")
+    w.Header().Set("Content-Type", "text/html; charset=utf-8")
     w.WriteHeader(http.StatusOK)
     w.Write([]byte(loginHTML))
 }
@@ -222,6 +230,8 @@ func (f *AuthorizationCodeFlow) showConsentForm(w http.ResponseWriter, r *http.R
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OAuth2 Consent</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 50px; background-color: #f5f5f5; }
@@ -268,7 +278,7 @@ func (f *AuthorizationCodeFlow) showConsentForm(w http.ResponseWriter, r *http.R
         userID,
     )
 
-    w.Header().Set("Content-Type", "text/html")
+    w.Header().Set("Content-Type", "text/html; charset=utf-8")
     w.WriteHeader(http.StatusOK)
     w.Write([]byte(consentHTML))
 }

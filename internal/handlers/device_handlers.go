@@ -57,6 +57,7 @@ func (h *DeviceHandlers) showDeviceForm(w http.ResponseWriter, r *http.Request) 
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Device Verification</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
@@ -237,7 +238,7 @@ func (h *DeviceHandlers) showDeviceForm(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := t.Execute(w, data); err != nil {
 		log.Printf("❌ Template execution error: %v", err)
 	}
@@ -330,6 +331,8 @@ func (h *DeviceHandlers) showSuccessPage(w http.ResponseWriter, userName string)
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Authorized</title>
     <style>
         body { 
@@ -392,7 +395,7 @@ func (h *DeviceHandlers) showSuccessPage(w http.ResponseWriter, userName string)
 </body>
 </html>`, userName)
 
-	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(successHTML))
 }

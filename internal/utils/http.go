@@ -1,10 +1,10 @@
 package utils
 
 import (
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "log"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
 )
 
 // WriteHTMLResponse writes an HTML response with the given status code and content
@@ -16,6 +16,8 @@ func WriteHTMLResponse(w http.ResponseWriter, statusCode int, content string) {
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OAuth2 Server</title>
     <style>
         body { 

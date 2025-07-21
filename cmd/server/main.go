@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sirupsen/logrus" // Add this import
 	"github.com/ory/fosite"
 	"github.com/ory/fosite/compose"
 	"github.com/ory/fosite/storage"
+	"github.com/sirupsen/logrus" // Add this import
 
 	"oauth2-server/internal/auth"
 	"oauth2-server/internal/flows"
@@ -29,7 +29,7 @@ var log = logrus.New()
 
 var (
 	// Application configuration
-	appConfig *config.Config
+	cfg *config.Config
 
 	// OAuth2 provider and stores
 	oauth2Provider fosite.OAuth2Provider
@@ -54,21 +54,23 @@ var (
 	registrationHandlers *handlers.RegistrationHandlers
 )
 
+// CompositeStore combines our custom ClientStore with Fosite's MemoryStore
+type CompositeStore struct {
+	*store.ClientStore
+	*storage.MemoryStore
+}
+
+// GetClient implements fosite.ClientManager
+func (c *CompositeStore) GetClient(ctx context.Context, id string) (fosite.Client, error) {
+	return c.ClientStore.GetClient(ctx, id)
+}
+
 func main() {
 	log.Println("🚀 Starting OAuth2 Server...")
 
-	// Initialize configuration from YAML
+	// Load configuration from YAML
 	var err error
-	appConfig, err = config.NewConfig() // Will automatically look for config.yaml
-	if err != nil {
-		log.Fatalf("❌ Failed to load configuration: %v", err)
-	}
-
-	log.Printf("📋 Loaded configuration: %s with %d clients",
-		appConfig.BaseURL, len(appConfig.Clients))
-
-	// Load configuration
-	cfg, err := config.Load()  // Note: cfg, not config
+	cfg, err = config.NewConfig()  // Use = instead of := to set the global variable
 	if err != nil {
 		log.Fatalf("❌ Failed to load configuration: %v", err)
 	}
@@ -114,7 +116,7 @@ func main() {
 	tokenStore = store.NewTokenStore()
 
 	// Load clients from configuration
-	if err := clientStore.LoadClientsFromConfig(cfg.Clients); err != nil { // Fix: use cfg.Clients instead of config.Clients
+	if err := clientStore.LoadClientsFromConfig(cfg.Clients); err != nil {
 		log.Fatalf("❌ Failed to load clients from config: %v", err)
 	}
 
@@ -126,21 +128,18 @@ func main() {
 	// Initialize flows
 	initializeFlows()
 
-	// Setup default clients
-	setupDefaultClients()
-
 	// Setup routes
 	setupRoutes()
 
 	// Start server
-	log.Printf("🌐 OAuth2 server starting on port %s", appConfig.Port)
-	log.Printf("🔗 Authorization endpoint: %s/auth", appConfig.BaseURL)
-	log.Printf("🎫 Token endpoint: %s/token", appConfig.BaseURL)
-	log.Printf("📱 Device authorization: %s/device_authorization", appConfig.BaseURL)
-	log.Printf("🔧 Client registration: %s/register", appConfig.BaseURL)
-	log.Printf("🏥 Health check: %s/health", appConfig.BaseURL)
+	log.Printf("🌐 OAuth2 server starting on port %d", cfg.Server.Port)
+	log.Printf("🔗 Authorization endpoint: %s/auth", cfg.Server.BaseURL)
+	log.Printf("🎫 Token endpoint: %s/token", cfg.Server.BaseURL)
+	log.Printf("📱 Device authorization: %s/device_authorization", cfg.Server.BaseURL)
+	log.Printf("🔧 Client registration: %s/register", cfg.Server.BaseURL)
+	log.Printf("🏥 Health check: %s/health", cfg.Server.BaseURL)
 
-	if err := http.ListenAndServe(":"+appConfig.Port, nil); err != nil {
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", cfg.Server.Port), nil); err != nil {
 		log.Fatalf("❌ Server failed to start: %v", err)
 	}
 }
@@ -158,21 +157,31 @@ func initializeOAuth2Provider() error {
 		return fmt.Errorf("failed to generate RSA key: %w", err)
 	}
 
-	// Create memory store
-	fositeStore := storage.NewMemoryStore()
+	// Create memory store for non-client data (sessions, codes, etc.)
+	memoryStore := storage.NewMemoryStore()
+	
+	// Create a composite store that uses our clientStore for clients
+	// and memoryStore for everything else
+	compositeStore := &CompositeStore{
+		ClientStore:  clientStore,
+		MemoryStore:  memoryStore,
+	}
 
 	// Configure OAuth2 provider
 	config := &fosite.Config{
 		AccessTokenLifespan:   time.Hour,
 		RefreshTokenLifespan:  time.Hour * 24 * 30,
 		AuthorizeCodeLifespan: time.Minute * 10,
-		GlobalSecret:          []byte("some-cool-secret-that-is-32bytes"),
+		GlobalSecret:          []byte(cfg.Security.JWTSecret + "-padded-to-32-bytes-for-hmac-security"), // Ensure adequate length
+		AccessTokenIssuer:     cfg.Server.BaseURL,
+		ScopeStrategy:         fosite.HierarchicScopeStrategy,
+		AudienceMatchingStrategy: fosite.DefaultAudienceMatchingStrategy,
 	}
 
 	// Build OAuth2 provider with all grant types
 	oauth2Provider = compose.Compose(
 		config,
-		fositeStore,
+		compositeStore,
 		&compose.CommonStrategy{
 			CoreStrategy: compose.NewOAuth2HMACStrategy(config),
 			OpenIDConnectTokenStrategy: compose.NewOpenIDConnectStrategy(
@@ -195,22 +204,22 @@ func initializeOAuth2Provider() error {
 
 func initializeFlows() {
 	// Initialize token handlers
-	tokenHandlers = handlers.NewTokenHandlers(clientStore, tokenStore, appConfig)
+	tokenHandlers = handlers.NewTokenHandlers(clientStore, tokenStore, cfg)
 
-	authCodeFlow = flows.NewAuthorizationCodeFlow(oauth2Provider, appConfig)
-	clientCredsFlow = flows.NewClientCredentialsFlow(clientStore, tokenStore, appConfig)
-	refreshTokenFlow = flows.NewRefreshTokenFlow(clientStore, tokenStore, appConfig)
-	tokenExchangeFlow = flows.NewTokenExchangeFlow(clientStore, tokenStore, appConfig)
-	deviceCodeFlow = flows.NewDeviceCodeFlow(clientStore, appConfig)
+	authCodeFlow = flows.NewAuthorizationCodeFlow(oauth2Provider, cfg)
+	clientCredsFlow = flows.NewClientCredentialsFlow(clientStore, tokenStore, cfg)
+	refreshTokenFlow = flows.NewRefreshTokenFlow(clientStore, tokenStore, cfg)
+	tokenExchangeFlow = flows.NewTokenExchangeFlow(clientStore, tokenStore, cfg)
+	deviceCodeFlow = flows.NewDeviceCodeFlow(clientStore, cfg)
 
 	// Start cleanup timer for expired device codes
 	deviceCodeFlow.StartCleanupTimer()
 
 	// Initialize documentation handler
-	docsHandler = handlers.NewDocsHandler(appConfig)
+	docsHandler = handlers.NewDocsHandler(cfg)
 
 	// Initialize registration handlers
-	registrationHandlers = handlers.NewRegistrationHandlers(clientStore, appConfig)
+	registrationHandlers = handlers.NewRegistrationHandlers(clientStore, cfg)
 
 	log.Printf("✅ OAuth2 flows initialized")
 }
@@ -218,7 +227,7 @@ func initializeFlows() {
 func setupDefaultClients() {
 	log.Println("🔧 Setting up clients from configuration...")
 
-	for _, clientConfig := range appConfig.Clients {
+	for _, clientConfig := range cfg.Clients {
 		// Convert ClientConfig to models.ClientInfo
 		clientInfo := clientConfig.ToModelsClientInfo()
 		client := store.CreateDefaultClient(clientInfo)
@@ -229,7 +238,7 @@ func setupDefaultClients() {
 		log.Printf("✅ Client registered: %s (%s)", clientConfig.ID, clientConfig.Name)
 	}
 
-	log.Printf("🎯 %d clients registered successfully", len(appConfig.Clients))
+	log.Printf("🎯 %d clients registered successfully", len(cfg.Clients))
 }
 
 func setupRoutes() {
@@ -268,12 +277,16 @@ func setupRoutes() {
 	http.HandleFunc("/docs/", proxyAwareMiddleware(docsWrapperHandler))
 
 	// Add debug endpoints (only in development)
-	if appConfig.Logging.Level == "debug" { // Fix: use appConfig instead of cfg
-		debugHandlers := handlers.NewDebugHandlers(clientStore, appConfig) // Fix: use appConfig
-		http.HandleFunc("/debug/clients", debugHandlers.HandleDebugClients)
-		http.HandleFunc("/debug/client", debugHandlers.HandleDebugClient)
-		http.HandleFunc("/debug/config", debugHandlers.HandleDebugConfig)
-		log.Printf("🔧 Debug endpoints enabled at /debug/*")
+	if cfg != nil && cfg.Logging.Level == "debug" {
+		debugHandlers := handlers.NewDebugHandlers(clientStore, cfg)
+		if debugHandlers != nil {
+			http.HandleFunc("/debug/clients", debugHandlers.HandleDebugClients)
+			http.HandleFunc("/debug/client", debugHandlers.HandleDebugClient)
+			http.HandleFunc("/debug/config", debugHandlers.HandleDebugConfig)
+			log.Printf("🔧 Debug endpoints enabled at /debug/*")
+		} else {
+			log.Printf("⚠️ Failed to create debug handlers")
+		}
 	}
 }
 
@@ -368,6 +381,8 @@ func showDeviceVerificationForm(w http.ResponseWriter, r *http.Request) {
 	html := `<!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Verification</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; }
@@ -409,7 +424,7 @@ func showDeviceVerificationForm(w http.ResponseWriter, r *http.Request) {
 </body>
 </html>`
 
-	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }
 
@@ -447,7 +462,7 @@ func handleDeviceVerification(w http.ResponseWriter, r *http.Request) {
 
 // Add helper function for user authentication
 func authenticateUserFromConfig(username, password string) *config.User {
-	if user, found := appConfig.GetUserByUsername(username); found {
+	if user, found := cfg.GetUserByUsername(username); found {
 		// In a real implementation, you'd hash and compare passwords properly
 		if user.Password == password {
 			return user
@@ -460,6 +475,8 @@ func showDeviceVerificationSuccess(w http.ResponseWriter, r *http.Request) {
 	html := `<!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Device Authorized</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 500px; margin: 50px auto; padding: 20px; text-align: center; }
@@ -474,7 +491,7 @@ func showDeviceVerificationSuccess(w http.ResponseWriter, r *http.Request) {
 </body>
 </html>`
 
-	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }
 
@@ -507,8 +524,8 @@ func userInfoHandler(w http.ResponseWriter, r *http.Request) {
 	// For now, return the first user's info or a default user
 	// In a real implementation, you'd extract user ID from the token
 	var userInfo map[string]interface{}
-	if len(appConfig.Users) > 0 {
-		user := appConfig.Users[0]
+	if len(cfg.Users) > 0 {
+		user := cfg.Users[0]
 		userInfo = map[string]interface{}{
 			"sub":      user.ID,
 			"name":     user.Name,
@@ -534,7 +551,7 @@ func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 
 	// Get the effective base URL (proxy-aware)
-	baseURL := appConfig.GetEffectiveBaseURL(r)
+	baseURL := cfg.GetEffectiveBaseURL(r)
 
 	wellKnown := map[string]interface{}{
 		// OAuth2 Authorization Server Metadata (RFC 8414)
@@ -697,7 +714,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		"status":    "healthy",
 		"timestamp": time.Now().Unix(),
 		"version":   "1.0.0",
-		"base_url":  appConfig.BaseURL,
+		"base_url":  cfg.Server.BaseURL,
 		"clients":   len(clientStore.ListClients()),
 	}
 
@@ -708,9 +725,9 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	// Generate user list from configuration
 	var userListHTML strings.Builder
-	if len(appConfig.Users) > 0 {
+	if len(cfg.Users) > 0 {
 		userListHTML.WriteString("<h3>👥 Available Test Users:</h3><ul>")
-		for _, user := range appConfig.Users {
+		for _, user := range cfg.Users {
 			userListHTML.WriteString(fmt.Sprintf(
 				"<li><strong>%s</strong> (%s) - Password: <code>%s</code></li>",
 				user.Username, user.Name, user.Password))
@@ -722,9 +739,9 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Generate client list from configuration
 	var clientListHTML strings.Builder
-	if len(appConfig.Clients) > 0 {
+	if len(cfg.Clients) > 0 {
 		clientListHTML.WriteString("<h3>🔑 Configured Clients:</h3><ul>")
-		for _, client := range appConfig.Clients {
+		for _, client := range cfg.Clients {
 			clientListHTML.WriteString(fmt.Sprintf(
 				"<li><strong>%s</strong> - %s<br><small>Grant Types: %s</small></li>",
 				client.ID, client.Name, strings.Join(client.GrantTypes, ", ")))
@@ -738,6 +755,8 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OAuth2 Server</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }
@@ -793,9 +812,9 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
         </div>
     </div>
 </body>
-</html>`, appConfig.BaseURL, userListHTML.String(), clientListHTML.String())
+</html>`, cfg.Server.BaseURL, userListHTML.String(), clientListHTML.String())
 
-	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(homeHTML))
 }
@@ -806,22 +825,22 @@ func client1AuthHandler(w http.ResponseWriter, r *http.Request) {
 	var clientID string
 	var redirectURI string
 	
-	if len(appConfig.Clients) > 0 {
-		client := appConfig.Clients[0]
+	if len(cfg.Clients) > 0 {
+		client := cfg.Clients[0]
 		clientID = client.ID
 		if len(client.RedirectURIs) > 0 {
 			redirectURI = client.RedirectURIs[0]
 		} else {
-			redirectURI = appConfig.BaseURL + "/client1/callback"
+			redirectURI = cfg.Server.BaseURL + "/client1/callback"
 		}
 	} else {
 		// Fallback to default values
 		clientID = "frontend-app"
-		redirectURI = appConfig.BaseURL + "/client1/callback"
+		redirectURI = cfg.Server.BaseURL + "/client1/callback"
 	}
 
 	authURL := fmt.Sprintf("%s/auth?client_id=%s&redirect_uri=%s&response_type=code&scope=openid+profile+email&state=random-state",
-		appConfig.BaseURL, clientID, redirectURI)
+		cfg.Server.BaseURL, clientID, redirectURI)
 
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
@@ -903,12 +922,12 @@ func proxyAwareMiddleware(handler http.HandlerFunc) http.HandlerFunc {
 
 		// Update the config's BaseURL for this request if needed
 		if r.URL.Scheme != "" && r.Host != "" {
-			originalBaseURL := appConfig.BaseURL
-			appConfig.BaseURL = r.URL.Scheme + "://" + r.Host
+			originalBaseURL := cfg.Server.BaseURL
+			cfg.Server.BaseURL = r.URL.Scheme + "://" + r.Host
 
 			// Restore original BaseURL after request
 			defer func() {
-				appConfig.BaseURL = originalBaseURL
+				cfg.Server.BaseURL = originalBaseURL
 			}()
 		}
 
@@ -1005,8 +1024,8 @@ func introspectHandler(w http.ResponseWriter, r *http.Request) {
 
     // Get user information (use first user or default)
     var userID string
-    if len(appConfig.Users) > 0 {
-        userID = appConfig.Users[0].ID
+    if len(cfg.Users) > 0 {
+        userID = cfg.Users[0].ID
     } else {
         userID = "default-user"
     }
@@ -1021,7 +1040,7 @@ func introspectHandler(w http.ResponseWriter, r *http.Request) {
         "iat":        time.Now().Unix(),
         "sub":        userID,
         "aud":        []string{"api-service"},
-        "iss":        appConfig.BaseURL,
+        "iss":        cfg.Server.BaseURL,
     }
 
     w.Header().Set("Content-Type", "application/json")
