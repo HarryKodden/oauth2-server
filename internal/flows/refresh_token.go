@@ -137,7 +137,7 @@ func (f *RefreshTokenFlow) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = f.tokenStore.StoreRefreshToken(newRefreshToken, clientID, tokenInfo.UserID, refreshTokenExpiry)
+	err = f.tokenStore.StoreRefreshToken(newRefreshToken, clientID, tokenInfo.UserID, newScopeSlice, refreshTokenExpiry)
 	if err != nil {
 		log.Printf("❌ Error storing refresh token: %v", err)
 		utils.WriteServerError(w, "Failed to store refresh token")

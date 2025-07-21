@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/url"
 	"regexp"
+	"strings"
 )
 
 // ValidateClientID checks if the provided client ID is valid
@@ -138,9 +139,12 @@ func ValidateUserCode(userCode string) error {
 		return errors.New("user code cannot be empty")
 	}
 
+	// Remove hyphens and spaces for validation
+	cleanCode := strings.ReplaceAll(strings.ReplaceAll(userCode, "-", ""), " ", "")
+	
 	// User codes should be 6-8 characters, alphanumeric
 	re := regexp.MustCompile(`^[A-Z0-9]{6,8}$`)
-	if !re.MatchString(userCode) {
+	if !re.MatchString(cleanCode) {
 		return errors.New("invalid user code format")
 	}
 	return nil

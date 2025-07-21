@@ -72,6 +72,7 @@ clients:
       - "api:read"
       - "api:write"
       - "api:admin"
+      - "offline_access"
     audience:
       - "api-service"
     token_endpoint_auth_method: "client_secret_basic"

@@ -78,13 +78,13 @@ func (s *TokenStore) StoreAccessToken(tokenString, clientID, userID string, scop
 }
 
 // StoreRefreshToken stores a refresh token
-func (s *TokenStore) StoreRefreshToken(tokenString, clientID, userID string, expiresAt time.Time) error {
+func (s *TokenStore) StoreRefreshToken(tokenString, clientID, userID string, scopes []string, expiresAt time.Time) error {
 	token := &Token{
 		Token:     tokenString,
 		TokenType: "refresh",
 		ClientID:  clientID,
 		UserID:    userID,
-		Scopes:    []string{}, // Refresh tokens typically don't store scopes
+		Scopes:    scopes, // Store scopes with refresh token for validation
 		ExpiresAt: expiresAt,
 		Revoked:   false,
 		CreatedAt: time.Now(),

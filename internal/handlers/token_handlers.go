@@ -13,6 +13,8 @@ import (
 	"oauth2-server/internal/store"
 	"oauth2-server/internal/utils"
 	"oauth2-server/pkg/config"
+
+	"github.com/ory/fosite"
 )
 
 // TokenHandlers handles token-related endpoints
@@ -284,8 +286,8 @@ func (h *TokenHandlers) HandleTokenExchange(w http.ResponseWriter, r *http.Reque
 		refreshToken, err := h.generateRefreshToken()
 		if err == nil {
 			refreshExpiresAt := time.Now().Add(24 * time.Hour * 30)
-			// Fix: Remove extra parameters - StoreRefreshToken only takes token, clientID, userID, and expiry
-			h.tokenStore.StoreRefreshToken(refreshToken, clientID, tokenInfo.UserID, refreshExpiresAt)
+			scopeSlice := strings.Fields(scope)
+			h.tokenStore.StoreRefreshToken(refreshToken, clientID, tokenInfo.UserID, scopeSlice, refreshExpiresAt)
 			response["refresh_token"] = refreshToken
 		}
 	}
@@ -366,6 +368,21 @@ func (h *TokenHandlers) HandleClientCredentials(w http.ResponseWriter, r *http.R
 		"token_type":   "Bearer",
 		"expires_in":   3600,
 		"scope":        requestedScope,
+	}
+
+	// Generate refresh token if offline_access scope is requested
+	// This is useful for long-running services that need refresh capabilities
+	if strings.Contains(requestedScope, "offline_access") || strings.Contains(requestedScope, "refresh_token") {
+		refreshToken, err := h.generateRefreshToken()
+		if err != nil {
+			log.Printf("Failed to generate refresh token: %v", err)
+		} else {
+			// Store refresh token with expiry (30 days for refresh tokens)
+			refreshExpiresAt := time.Now().Add(30 * 24 * time.Hour)
+			h.tokenStore.StoreRefreshToken(refreshToken, clientID, "", scopeSlice, refreshExpiresAt)
+			response["refresh_token"] = refreshToken
+			log.Printf("✅ Refresh token issued for client credentials flow: %s", clientID)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -472,8 +489,8 @@ func (h *TokenHandlers) HandleRefreshToken(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// StoreRefreshToken only takes token, clientID, userID, and expiry
-	err = h.tokenStore.StoreRefreshToken(newRefreshToken, clientID, tokenInfo.UserID, refreshTokenExpiry)
+	// Store new refresh token with scopes
+	err = h.tokenStore.StoreRefreshToken(newRefreshToken, clientID, tokenInfo.UserID, requestedScopes, refreshTokenExpiry)
 	if err != nil {
 		log.Printf("❌ Error storing refresh token: %v", err)
 		utils.WriteServerError(w, "Failed to store refresh token")
@@ -525,6 +542,16 @@ func (h *TokenHandlers) generateRefreshToken() (string, error) {
 
 // clientSupportsGrantType checks if a client supports a specific grant type
 func (h *TokenHandlers) clientSupportsGrantType(client interface{}, grantType string) bool {
+	// Try fosite.Arguments first (our client store)
+	if c, ok := client.(interface{ GetGrantTypes() fosite.Arguments }); ok {
+		for _, gt := range c.GetGrantTypes() {
+			if gt == grantType {
+				return true
+			}
+		}
+		return false
+	}
+	// Fallback to []string interface
 	if c, ok := client.(interface{ GetGrantTypes() []string }); ok {
 		for _, gt := range c.GetGrantTypes() {
 			if gt == grantType {

@@ -439,10 +439,18 @@ func handleDeviceVerification(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 
+	// Normalize user code - trim, uppercase, and ensure consistent formatting
+	userCode = strings.TrimSpace(strings.ToUpper(userCode))
+	
 	// Validate user code format
 	if err := utils.ValidateUserCode(userCode); err != nil {
 		http.Redirect(w, r, "/device?error=Invalid user code format", http.StatusFound)
 		return
+	}
+
+	// Ensure user code has the hyphen format for device flow lookup
+	if len(userCode) == 8 && !strings.Contains(userCode, "-") {
+		userCode = fmt.Sprintf("%s-%s", userCode[:4], userCode[4:])
 	}
 
 	// Authenticate user against configured users

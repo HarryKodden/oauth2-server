@@ -36,7 +36,7 @@ echo "4. Testing token endpoint with client credentials (Client2)..."
 # Test Client2 - Client Credentials Flow
 TOKEN_RESPONSE=$(curl -s -X POST http://localhost:8080/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=backend-client&client_secret=backend-client-secret&scope=api:read api:write")
+  -d "grant_type=client_credentials&client_id=backend-client&client_secret=backend-client-secret&scope=api:read api:write offline_access")
 
 echo "Token Response for Client2:"
 echo "$TOKEN_RESPONSE" | jq . 2>/dev/null || echo "$TOKEN_RESPONSE"
@@ -148,7 +148,7 @@ echo "7. Testing Token Exchange (RFC 8693)..."
 # Test Token Exchange with a sample token
 EXCHANGE_RESPONSE=$(curl -s -X POST http://localhost:8080/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange&client_id=backend-client&client_secret=backend-client-secret&subject_token=sample-access-token&subject_token_type=urn:ietf:params:oauth:token-type:access_token&audience=api-service&scope=api:read")
+  -d "grant_type=urn:ietf:params:oauth:grant-type:token-exchange&client_id=backend-client&client_secret=backend-client-secret&subject_token=$ACCESS_TOKEN&subject_token_type=urn:ietf:params:oauth:token-type:access_token&audience=api-service&scope=api:read")
 
 echo "Token Exchange Response:"
 echo "$EXCHANGE_RESPONSE" | jq . 2>/dev/null || echo "$EXCHANGE_RESPONSE"
