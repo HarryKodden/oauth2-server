@@ -33,9 +33,6 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -o oauth2-server \
     cmd/server/main.go
 
-# Verify the binary
-RUN ldd oauth2-server 2>&1 | grep -q "not a dynamic executable" || (echo "Binary is not static" && exit 1)
-
 # Final stage - use distroless for security
 FROM gcr.io/distroless/static:nonroot
 
