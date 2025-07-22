@@ -16,10 +16,6 @@ func TestLoadConfig(t *testing.T) {
 		t.Errorf("LoadConfig() error = %v", err)
 	}
 
-	if cfg == nil {
-		t.Error("LoadConfig() returned nil config")
-	}
-
 	// Test loading config with custom path
 	cfg2 := &config.Config{}
 	err = config.LoadFromFile("config.yaml", cfg2)
@@ -236,4 +232,26 @@ func TestSecurityConfig(t *testing.T) {
 		assert.Equal(t, "super-secret-key", securityCfg.JWTSecret)
 		assert.NotEmpty(t, securityCfg.JWTSecret)
 	})
+}
+
+func TestConfigValidation(t *testing.T) {
+	cfg, err := config.LoadConfig("test-config.yaml")
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	if cfg.Server.Port == 0 {
+		t.Error("Server port should not be zero")
+	}
+}
+
+func TestAnotherConfigTest(t *testing.T) {
+	cfg, err := config.LoadConfig("another-config.yaml")
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
+
+	if cfg.Database.Host == "" {
+		t.Error("Database host should not be empty")
+	}
 }

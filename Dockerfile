@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.23-alpine AS builder  # Updated to Go 1.23
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -26,6 +26,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o oauth2-server \
     cmd/server/main.go
 
+# Final stage
 FROM alpine:latest
 
 # Install runtime dependencies
@@ -40,11 +41,7 @@ WORKDIR /app
 
 # Copy binary from builder stage
 COPY --from=builder /app/oauth2-server .
-COPY --from=builder /app/oauth_examples . 2>/dev/null || true
-
-# Copy configuration files
-COPY config.yaml .
-COPY --chown=appuser:appgroup . /app/
+COPY --from=builder /app/config.yaml .
 
 # Change ownership
 RUN chown -R appuser:appgroup /app

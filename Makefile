@@ -45,126 +45,151 @@ clean:
 	rm -rf bin/
 	rm -f coverage.out coverage.html
 
-# Lint code
-lint:
-	@echo "🔍 Linting code..."
-	golangci-lint run
-
-# Format code
+# Code quality targets
 fmt:
-	@echo "✨ Formatting code..."
-	go fmt ./...
+	@echo "🎨 Formatting Go code..."
+	gofmt -s -w .
+	@echo "✅ Code formatted successfully"
 
-# Docker build
-docker-build:
-	@echo "🐳 Building Docker image..."
-	docker build -t oauth2-server .
+vet:
+	@echo "🔍 Running go vet..."
+	go vet ./...
+	@echo "✅ go vet completed"
 
-# Docker run
-docker-run:
-	@echo "🐳 Starting Docker containers..."
-	docker-compose up
+staticcheck:
+	@echo "🔍 Running staticcheck..."
+	@if ! command -v staticcheck >/dev/null 2>&1; then \
+		echo "Installing staticcheck..."; \
+		go install honnef.co/go/tools/cmd/staticcheck@latest; \
+	fi
+	@echo "Running staticcheck with full Go bin path..."
+	$(shell go env GOPATH)/bin/staticcheck ./...
+	@echo "✅ staticcheck completed"
 
-# Docker clean
-docker-clean:
-	@echo "🐳 Cleaning Docker containers..."
-	docker-compose down -v
+# Alternative staticcheck target that uses go run instead
+staticcheck-alt:
+	@echo "🔍 Running staticcheck (alternative method)..."
+	go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+	@echo "✅ staticcheck completed"
 
-# Run specific test
-test-flow:
-	@echo "🧪 Running flow tests..."
-	go test -v ./internal/flows/...
+# Enhanced lint target with better error handling
+lint: fmt vet
+	@echo "🔍 Running staticcheck..."
+	@if command -v staticcheck >/dev/null 2>&1; then \
+		staticcheck ./...; \
+	#elif [ -f "$(shell go env GOPATH)/bin/staticcheck" ]; then \
+	#	$(shell go env GOPATH)/bin/staticcheck ./...; \
+	#else \
+	#	echo "Installing staticcheck..."; \
+	#	go install honnef.co/go/tools/cmd/staticcheck@latest; \
+	#	$(shell go env GOPATH)/bin/staticcheck ./...; \
+	#fi
+	@echo "✅ All linting completed"
 
-# Run integration tests
-test-integration:
-	@echo "🧪 Running integration tests..."
-	go test -v -tags=integration ./...
-
-# Benchmark tests
-benchmark:
-	@echo "⚡ Running benchmarks..."
-	go test -bench=. ./...
-
-# Generate test coverage report
-coverage-html:
-	@echo "📈 Generating coverage report..."
-	go test -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "✅ Coverage report generated: coverage.html"
-
-# Check for security vulnerabilities
-security:
-	@echo "🔒 Checking for security vulnerabilities..."
-	gosec ./...
-
-# Install development dependencies
+# Install all development tools with proper PATH setup
 install-deps:
 	@echo "📦 Installing development dependencies..."
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
 	go install github.com/cosmtrek/air@latest
+	go install honnef.co/go/tools/cmd/staticcheck@latest
+	@echo "📍 Tools installed in: $(shell go env GOPATH)/bin"
+	@echo "💡 Make sure $(shell go env GOPATH)/bin is in your PATH"
+	@echo "   Add this to your shell profile:"
+	@echo "   export PATH=\"$(shell go env GOPATH)/bin:\$$PATH\""
 
-# Quick check - format, tidy, check compilation
-quick-check: fmt tidy check
-	@echo "✅ Quick check completed"
+# Check if tools are properly installed
+check-tools:
+	@echo "🔧 Checking development tools..."
+	@echo "Go version: $(shell go version)"
+	@echo "GOPATH: $(shell go env GOPATH)"
+	@echo "GOBIN: $(shell go env GOBIN)"
+	@echo ""
+	@echo "Checking tool availability:"
+	@if command -v staticcheck >/dev/null 2>&1; then \
+		echo "✅ staticcheck: $(shell which staticcheck)"; \
+	#elif [ -f "$(shell go env GOPATH)/bin/staticcheck" ]; then \
+	#	echo "⚠️  staticcheck: $(shell go env GOPATH)/bin/staticcheck (not in PATH)"; \
+	#else \
+	#	echo "❌ staticcheck: not installed"; \
+	#fi
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		echo "✅ golangci-lint: $(shell which golangci-lint)"; \
+	#elif [ -f "$(shell go env GOPATH)/bin/golangci-lint" ]; then \
+	#	echo "⚠️  golangci-lint: $(shell go env GOPATH)/bin/golangci-lint (not in PATH)"; \
+	#else \
+	#	echo "❌ golangci-lint: not installed"; \
+	#fi
+	@if command -v gosec >/dev/null 2>&1; then \
+		echo "✅ gosec: $(shell which gosec)"; \
+	#elif [ -f "$(shell go env GOPATH)/bin/gosec" ]; then \
+	#	echo "⚠️  gosec: $(shell go env GOPATH)/bin/gosec (not in PATH)"; \
+	#else \
+	#	echo "❌ gosec: not installed"; \
+	#fi
 
-# Full check - format, tidy, lint, test, security
-full-check: fmt tidy lint test security
+# Enhanced security check with proper path handling
+security:
+	@echo "🔒 Checking for security vulnerabilities..."
+	@if command -v gosec >/dev/null 2>&1; then \
+		gosec ./...; \
+	#elif [ -f "$(shell go env GOPATH)/bin/gosec" ]; then \
+	#	$(shell go env GOPATH)/bin/gosec ./...; \
+	#else \
+	#	echo "Installing gosec..."; \
+	#	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest; \
+	#	$(shell go env GOPATH)/bin/gosec ./...; \
+	#fi
+
+# Enhanced golangci-lint target
+golangci-lint:
+	@echo "🔍 Running golangci-lint..."
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run; \
+	#elif [ -f "$(shell go env GOPATH)/bin/golangci-lint" ]; then \
+	#	$(shell go env GOPATH)/bin/golangci-lint run; \
+	#else \
+	#	echo "Installing golangci-lint..."; \
+	#	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest; \
+	#	$(shell go env GOPATH)/bin/golangci-lint run; \
+	#fi
+	@echo "✅ golangci-lint completed"
+
+# Comprehensive lint target using golangci-lint (includes staticcheck)
+lint-comprehensive: fmt vet golangci-lint
+	@echo "✅ Comprehensive linting completed"
+
+# Fix PATH issues by setting up proper Go environment
+setup-env:
+	@echo "🔧 Setting up Go development environment..."
+	@echo "Current GOPATH: $(shell go env GOPATH)"
+	@echo "Current PATH: $$PATH"
+	@echo ""
+	@echo "To fix PATH issues, add this to your shell profile (~/.bashrc, ~/.zshrc, etc.):"
+	@echo "export PATH=\"$(shell go env GOPATH)/bin:\$$PATH\""
+	@echo ""
+	@echo "Or run this command to add it temporarily:"
+	@echo "export PATH=\"$(shell go env GOPATH)/bin:\$$PATH\""
+
+# Update .PHONY to include new targets
+.PHONY: fmt vet staticcheck staticcheck-alt lint golangci-lint lint-comprehensive fix-imports pre-commit install-deps check-tools security setup-env
+
+# Update existing targets to use the new patterns
+# Pre-commit checks with better tool handling
+pre-commit: fmt vet
+	@echo "🔍 Running pre-commit checks..."
+	@if command -v staticcheck >/dev/null 2>&1; then \
+		staticcheck ./...; \
+	#elif [ -f "$(shell go env GOPATH)/bin/staticcheck" ]; then \
+	#	$(shell go env GOPATH)/bin/staticcheck ./...; \
+	#else \
+	#	echo "Installing staticcheck..."; \
+	#	go install honnef.co/go/tools/cmd/staticcheck@latest; \
+	#	$(shell go env GOPATH)/bin/staticcheck ./...; \
+	#fi
+	@$(MAKE) test
+	@echo "✅ Pre-commit checks completed"
+
+# Full check with comprehensive linting
+full-check: fmt tidy lint-comprehensive test security
 	@echo "✅ Full check completed"
-
-# Build for multiple platforms
-build-all:
-	@echo "🔨 Building for multiple platforms..."
-	@mkdir -p bin
-	GOOS=linux GOARCH=amd64 go build -ldflags "-s -w" -o bin/oauth2-server-linux-amd64 cmd/server/main.go
-	GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w" -o bin/oauth2-server-darwin-amd64 cmd/server/main.go
-	GOOS=darwin GOARCH=arm64 go build -ldflags "-s -w" -o bin/oauth2-server-darwin-arm64 cmd/server/main.go
-	GOOS=windows GOARCH=amd64 go build -ldflags "-s -w" -o bin/oauth2-server-windows-amd64.exe cmd/server/main.go
-	@echo "✅ Multi-platform build completed"
-
-# Validate configuration
-validate-config:
-	@echo "🔍 Validating configuration..."
-	go run cmd/server/main.go --validate-config
-	@echo "✅ Configuration is valid"
-
-# Generate example config
-generate-config:
-	@echo "📝 Generating example configuration..."
-	@mkdir -p configs
-	@cp config.yaml configs/config.example.yaml
-	@echo "✅ Example configuration generated: configs/config.example.yaml"
-
-# Show help
-help:
-	@echo "🔐 OAuth2 Server - Available Commands:"
-	@echo ""
-	@echo "Development:"
-	@echo "  make build       - Build the application"
-	@echo "  make run         - Run the application"
-	@echo "  make dev         - Run with live reload"
-	@echo "  make check       - Check for compilation errors"
-	@echo ""
-	@echo "Testing:"
-	@echo "  make test        - Run all tests"
-	@echo "  make test-coverage - Run tests with coverage"
-	@echo "  make test-flow   - Run flow tests only"
-	@echo "  make benchmark   - Run benchmark tests"
-	@echo ""
-	@echo "Code Quality:"
-	@echo "  make fmt         - Format code"
-	@echo "  make lint        - Lint code"
-	@echo "  make security    - Security scan"
-	@echo "  make quick-check - Format, tidy, check"
-	@echo "  make full-check  - Complete validation"
-	@echo ""
-	@echo "Docker:"
-	@echo "  make docker-build - Build Docker image"
-	@echo "  make docker-run   - Run with Docker Compose"
-	@echo ""
-	@echo "Utilities:"
-	@echo "  make clean       - Clean build artifacts"
-	@echo "  make tidy        - Tidy dependencies"
-	@echo "  make install-deps - Install dev dependencies"
-	@echo "  make validate-config - Validate configuration"
-	@echo "  make generate-config - Generate example configuration"

@@ -2,11 +2,10 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // LoadConfig loads configuration from environment variables and config file
@@ -45,7 +44,7 @@ func Load() (*Config, error) {
 
 // LoadFromFile loads configuration from a YAML file
 func LoadFromFile(path string, cfg *Config) error {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}

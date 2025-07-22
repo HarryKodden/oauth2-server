@@ -2,12 +2,12 @@ package config
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"oauth2-server/internal/models"
 	"oauth2-server/internal/utils"
+	"os"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Config holds the application configuration
@@ -329,7 +329,7 @@ func LoadYAMLConfig(configPath string) (*YAMLConfig, error) {
 		configPath = "config.yaml"
 	}
 
-	data, err := ioutil.ReadFile(configPath)
+	data, err := os.ReadFile(configPath) // Instead of ioutil.ReadFile
 	if err != nil {
 		return nil, fmt.Errorf("failed to read YAML config file: %w", err)
 	}
@@ -340,6 +340,16 @@ func LoadYAMLConfig(configPath string) (*YAMLConfig, error) {
 	}
 
 	return &yamlConfig, nil
+}
+
+// Example of how to replace io/ioutil.ReadFile:
+func loadConfigFile(filename string) ([]byte, error) {
+	return os.ReadFile(filename)
+}
+
+// Example of how to replace io/ioutil.WriteFile:
+func saveConfigFile(filename string, data []byte) error {
+	return os.WriteFile(filename, data, 0644)
 }
 
 // Helper functions
