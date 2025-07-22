@@ -95,8 +95,8 @@ users:
 			t.Errorf("Expected port 9090, got %d", cfg.Server.Port)
 		}
 
-		if cfg.Server.Host != "localhost" {
-			t.Errorf("Expected host 'localhost', got '%s'", cfg.Server.Host)
+		if cfg.Server.Host != "test-host" {
+			t.Errorf("Expected host 'test-host', got '%s'", cfg.Server.Host)
 		}
 
 		if cfg.Security.JWTSecret != "test-secret-key" {
