@@ -2,64 +2,93 @@ package utils
 
 import (
 	"crypto/rand"
-	"encoding/base32"
-	"fmt"
-	"math/big"
+	"crypto/sha256"
+	"encoding/base64"
 	"strings"
 )
 
-// GenerateRandomString generates a random string of specified length
-func GenerateRandomString(length int) string {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		num, _ := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
-		b[i] = charset[num.Int64()]
+// GenerateRandomBytes generates cryptographically secure random bytes
+func GenerateRandomBytes(length int) ([]byte, error) {
+	bytes := make([]byte, length)
+	_, err := rand.Read(bytes)
+	if err != nil {
+		return nil, err
 	}
-	return string(b)
+	return bytes, nil
 }
 
-// GenerateUserCode generates a user-friendly code for device flow
+// GenerateRandomString generates a cryptographically secure random string
+func GenerateRandomString(length int) (string, error) {
+	bytes, err := GenerateRandomBytes(length)
+	if err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(bytes)[:length], nil
+}
+
+// GenerateUserCode generates a user-friendly device verification code
 func GenerateUserCode() string {
-	// Generate 8-character code using base32 (excludes confusing characters)
-	bytes := make([]byte, 5)
-	rand.Read(bytes)
-	code := base32.StdEncoding.EncodeToString(bytes)
-	code = strings.TrimRight(code, "=") // Remove padding
-
-	// Format as XXXX-XXXX for better readability
-	if len(code) >= 8 {
-		return fmt.Sprintf("%s-%s", code[:4], code[4:8])
-	}
-	return code
+	// Generate a shorter, more user-friendly code
+	code, _ := GenerateRandomString(8)
+	return strings.ToUpper(code)
 }
 
-// GenerateAuthorizationCode generates an authorization code
-func GenerateAuthorizationCode() string {
-	return GenerateRandomString(32)
+// GenerateState generates a state parameter for OAuth2 flows
+func GenerateState() string {
+	state, _ := GenerateRandomString(32)
+	return state
+}
+
+// GenerateNonce generates a nonce for OpenID Connect
+func GenerateNonce() string {
+	nonce, _ := GenerateRandomString(32)
+	return nonce
 }
 
 // GenerateAccessToken generates an access token
 func GenerateAccessToken() string {
-	return GenerateRandomString(32)
+	token, _ := GenerateRandomString(32)
+	return token
 }
 
 // GenerateRefreshToken generates a refresh token
 func GenerateRefreshToken() string {
-	return GenerateRandomString(32)
+	token, _ := GenerateRandomString(32)
+	return token
 }
 
-// GenerateClientID generates a client ID
+// GenerateClientID generates a unique client ID
 func GenerateClientID() string {
-	return GenerateRandomString(20)
+	id, _ := GenerateRandomString(16)
+	return "client_" + id
 }
 
-// GenerateClientSecret generates a client secret
+// GenerateClientSecret generates a secure client secret
 func GenerateClientSecret() string {
-	return GenerateRandomString(40)
+	secret, _ := GenerateRandomString(32)
+	return secret
 }
 
-// GenerateRegistrationAccessToken generates a registration access token
-func GenerateRegistrationAccessToken() string {
-	return GenerateRandomString(32)
+// GenerateAuthCode generates an authorization code
+func GenerateAuthCode() string {
+	code, _ := GenerateRandomString(32)
+	return code
+}
+
+// GenerateDeviceCode generates a device code
+func GenerateDeviceCode() string {
+	code, _ := GenerateRandomString(32)
+	return code
+}
+
+// GenerateCodeChallenge generates a PKCE code challenge
+func GenerateCodeChallenge(codeVerifier string) string {
+	hash := sha256.Sum256([]byte(codeVerifier))
+	return base64.URLEncoding.WithPadding(base64.NoPadding).EncodeToString(hash[:])
+}
+
+// GenerateCodeVerifier generates a PKCE code verifier
+func GenerateCodeVerifier() string {
+	verifier, _ := GenerateRandomString(128)
+	return verifier
 }

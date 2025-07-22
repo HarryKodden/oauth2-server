@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"log"
+	"net/http"
 	"sync"
 	"time"
 
 	"oauth2-server/internal/models"
+	"oauth2-server/internal/utils"
 	"oauth2-server/pkg/config"
 
 	"github.com/ory/fosite"
@@ -86,6 +88,17 @@ func (c *Client) IsPublic() bool {
 // GetAudience returns the client's audience
 func (c *Client) GetAudience() fosite.Arguments {
 	return fosite.Arguments(c.Audience)
+}
+
+// GetResolvedRedirectURIs returns the redirect URIs resolved to absolute URIs
+// based on the current request context (proxy-aware)
+func (c *Client) GetResolvedRedirectURIs(r *http.Request, configBaseURL string) []string {
+	return utils.ResolveRedirectURIs(c.RedirectURIs, r, configBaseURL)
+}
+
+// ValidateRedirectURI validates a redirect URI against this client's registered URIs
+func (c *Client) ValidateRedirectURI(requestedURI string, r *http.Request, configBaseURL string) bool {
+	return utils.ValidateClientRedirectURI(requestedURI, c.RedirectURIs, r, configBaseURL)
 }
 
 // CreateDefaultClient creates a default client from ClientInfo

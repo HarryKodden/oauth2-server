@@ -1,4 +1,7 @@
-.PHONY: build run test clean docker-build docker-run test-flow test-integration benchmark coverage-html security tidy check examples run-examples clean-examples examples-auth-code examples-client-creds examples-device examples-token-exchange examples-all run-examples-auth run-examples-client run-examples-device run-examples-token
+.PHONY: build test clean run dev
+
+# Default target
+all: build
 
 # Build the application
 build:
@@ -22,16 +25,6 @@ run:
 dev:
 	@echo "🔄 Starting development server with live reload..."
 	air
-
-# Run tests
-test:
-	@echo "🧪 Running tests..."
-	go test -v ./...
-
-# Run tests with coverage
-test-coverage:
-	@echo "📊 Running tests with coverage..."
-	go test -v -cover ./...
 
 # Tidy dependencies
 tidy:
@@ -193,3 +186,14 @@ pre-commit: fmt vet
 # Full check with comprehensive linting
 full-check: fmt tidy lint-comprehensive test security
 	@echo "✅ Full check completed"
+
+# Build for multiple platforms
+build-all:
+	GOOS=linux GOARCH=amd64 go build -o bin/oauth2-server-linux-amd64 ./cmd/server
+	GOOS=windows GOARCH=amd64 go build -o bin/oauth2-server-windows-amd64.exe ./cmd/server
+	GOOS=darwin GOARCH=amd64 go build -o bin/oauth2-server-darwin-amd64 ./cmd/server
+	GOOS=darwin GOARCH=arm64 go build -o bin/oauth2-server-darwin-arm64 ./cmd/server
+
+# Create bin directory
+bin:
+	mkdir -p bin

@@ -216,7 +216,7 @@ func initializeFlows() {
 	deviceCodeFlow.StartCleanupTimer()
 
 	// Initialize documentation handler
-	docsHandler = handlers.NewDocsHandler(cfg)
+	docsHandler = handlers.NewDocsHandler(cfg, clientStore)
 
 	// Initialize registration handlers
 	registrationHandlers = handlers.NewRegistrationHandlers(clientStore, cfg)
@@ -269,7 +269,11 @@ func setupRoutes() {
 	http.HandleFunc("/health", proxyAwareMiddleware(healthHandler))
 	http.HandleFunc("/", proxyAwareMiddleware(homeHandler))
 
-	// API endpoints
+	// Client management API endpoints (must come before general /api/ route)
+	http.HandleFunc("/api/clients", proxyAwareMiddleware(clientManagementHandler))
+	http.HandleFunc("/api/clients/", proxyAwareMiddleware(clientManagementHandler))
+
+	// General API endpoints (protected with authentication)
 	http.HandleFunc("/api/", proxyAwareMiddleware(apiHandler))
 
 	// Documentation endpoints
@@ -313,6 +317,17 @@ func registrationConfigHandler(w http.ResponseWriter, r *http.Request) {
 
 func docsWrapperHandler(w http.ResponseWriter, r *http.Request) {
 	docsHandler.ServeHTTP(w, r)
+}
+
+func clientManagementHandler(w http.ResponseWriter, r *http.Request) {
+	// Route client management API calls to the docs handler
+	if r.URL.Path == "/api/clients" {
+		docsHandler.HandleClientsAPI(w, r)
+	} else if len(r.URL.Path) > 13 && r.URL.Path[:13] == "/api/clients/" {
+		docsHandler.HandleClientAPI(w, r)
+	} else {
+		http.NotFound(w, r)
+	}
 }
 
 // Token handler that routes to appropriate flow

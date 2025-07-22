@@ -1,18 +1,90 @@
 package utils
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
-// ExtractBearerToken extracts the token from Authorization header
-func ExtractBearerToken(authHeader string) (string, error) {
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		return "", errors.New("invalid authorization header format")
+// HashPassword creates a hash of the password (placeholder implementation)
+func HashPassword(password string) string {
+	hash := sha256.Sum256([]byte(password))
+	return hex.EncodeToString(hash[:])
+}
+
+// ValidatePassword validates a password against its hash
+func ValidatePassword(password, hash string) bool {
+	return HashPassword(password) == hash
+}
+
+// CreateJWT creates a JWT token with the given claims
+func CreateJWT(claims jwt.Claims, signingKey []byte) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(signingKey)
+}
+
+// ValidateJWT validates a JWT token and returns the claims
+func ValidateJWT(tokenString string, signingKey []byte) (jwt.MapClaims, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return signingKey, nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
-	return parts[1], nil
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, fmt.Errorf("invalid token")
+}
+
+// ParseScope parses a space-separated scope string into a slice
+func ParseScope(scope string) []string {
+	if scope == "" {
+		return []string{}
+	}
+	return strings.Fields(scope)
+}
+
+// JoinScope joins a slice of scopes into a space-separated string
+func JoinScope(scopes []string) string {
+	return strings.Join(scopes, " ")
+}
+
+// ExtractBearerToken extracts a bearer token from the Authorization header
+func ExtractBearerToken(r *http.Request) string {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return ""
+	}
+
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return ""
+	}
+
+	return parts[1]
+}
+
+// GetCurrentTimeUnix returns the current time as Unix timestamp
+func GetCurrentTimeUnix() int64 {
+	return time.Now().Unix()
+}
+
+// IsExpired checks if a Unix timestamp is expired
+func IsExpired(timestamp int64) bool {
+	return time.Now().Unix() > timestamp
 }
 
 // ExtractClientCredentials extracts client credentials from request
@@ -56,18 +128,6 @@ func RemoveDuplicates(slice []string) []string {
 	}
 
 	return result
-}
-
-// IsValidRedirectURI validates a redirect URI
-func IsValidRedirectURI(uri string) bool {
-	if uri == "" {
-		return false
-	}
-
-	// Basic URL validation - in a real implementation, you'd be more thorough
-	return strings.HasPrefix(uri, "http://") ||
-		strings.HasPrefix(uri, "https://") ||
-		strings.Contains(uri, "://") // Allow custom schemes for mobile apps
 }
 
 // SplitScopes splits a space-separated scope string into individual scopes
@@ -126,26 +186,6 @@ func ExtractClientIDFromPath(path string) string {
 func ValidateRegistrationAccessToken(token string) bool {
 	// Simplified validation - in a real implementation, you'd validate JWT
 	return token != "" && len(token) > 10
-}
-
-// GetRequestBaseURL determines the base URL from the HTTP request, considering proxy headers
-func GetRequestBaseURL(r *http.Request) string {
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-
-	// Check for proxy headers
-	if proto := r.Header.Get("X-Forwarded-Proto"); proto != "" {
-		scheme = proto
-	}
-
-	host := r.Host
-	if forwarded := r.Header.Get("X-Forwarded-Host"); forwarded != "" {
-		host = forwarded
-	}
-
-	return scheme + "://" + host
 }
 
 // GetEffectiveBaseURL returns the effective base URL considering configuration and proxy headers
