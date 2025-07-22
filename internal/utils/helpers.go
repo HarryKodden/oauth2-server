@@ -8,31 +8,30 @@ import (
 
 // ExtractBearerToken extracts the token from Authorization header
 func ExtractBearerToken(authHeader string) (string, error) {
-    parts := strings.Split(authHeader, " ")
-    if len(parts) != 2 || parts[0] != "Bearer" {
-        return "", errors.New("invalid authorization header format")
-    }
-    return parts[1], nil
+	parts := strings.Split(authHeader, " ")
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return "", errors.New("invalid authorization header format")
+	}
+	return parts[1], nil
 }
 
 // ExtractClientCredentials extracts client credentials from request
 func ExtractClientCredentials(r *http.Request) (string, string, error) {
-    // Try basic auth first
-    if clientID, clientSecret, ok := r.BasicAuth(); ok {
-        return clientID, clientSecret, nil
-    }
-    
-    // Try form parameters
-    clientID := r.FormValue("client_id")
-    clientSecret := r.FormValue("client_secret")
-    
-    if clientID == "" {
-        return "", "", errors.New("client_id is required")
-    }
-    
-    return clientID, clientSecret, nil
-}
+	// Try basic auth first
+	if clientID, clientSecret, ok := r.BasicAuth(); ok {
+		return clientID, clientSecret, nil
+	}
 
+	// Try form parameters
+	clientID := r.FormValue("client_id")
+	clientSecret := r.FormValue("client_secret")
+
+	if clientID == "" {
+		return "", "", errors.New("client_id is required")
+	}
+
+	return clientID, clientSecret, nil
+}
 
 // Contains checks if a slice contains a specific string
 func Contains(slice []string, item string) bool {
@@ -156,4 +155,3 @@ func GetEffectiveBaseURL(configBaseURL string, r *http.Request) string {
 	}
 	return GetRequestBaseURL(r)
 }
-

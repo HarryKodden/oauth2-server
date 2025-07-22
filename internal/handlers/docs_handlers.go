@@ -1,42 +1,42 @@
 package handlers
 
 import (
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "oauth2-server/pkg/config"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"oauth2-server/pkg/config"
 )
 
 // DocsHandler provides interactive API documentation
 type DocsHandler struct {
-    config *config.Config
+	config *config.Config
 }
 
 // NewDocsHandler creates a new documentation handler
 func NewDocsHandler(cfg *config.Config) *DocsHandler {
-    return &DocsHandler{
-        config: cfg,
-    }
+	return &DocsHandler{
+		config: cfg,
+	}
 }
 
 // ServeHTTP handles the documentation endpoint
 func (h *DocsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-    if r.URL.Path == "/docs" {
-        h.serveDocs(w, r)
-        return
-    }
+	if r.URL.Path == "/docs" {
+		h.serveDocs(w, r)
+		return
+	}
 
-    if r.URL.Path == "/docs/api.json" {
-        h.serveOpenAPISpec(w, r)
-        return
-    }
+	if r.URL.Path == "/docs/api.json" {
+		h.serveOpenAPISpec(w, r)
+		return
+	}
 
-    http.NotFound(w, r)
+	http.NotFound(w, r)
 }
 
 // serveDocs serves the interactive documentation UI
 func (h *DocsHandler) serveDocs(w http.ResponseWriter, r *http.Request) {
-    html := fmt.Sprintf(`<!DOCTYPE html>
+	html := fmt.Sprintf(`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -322,21 +322,21 @@ func (h *DocsHandler) serveDocs(w http.ResponseWriter, r *http.Request) {
     </script>
 </body>
 </html>`,
-        h.config.BaseURL,
-        h.config.BaseURL,
-        h.generateAuthEndpoints(),
-        h.generateTokenEndpoints(),
-        h.generateDeviceFlowEndpoints(),
-        h.generateClientMgmtEndpoints(),
-    )
+		h.config.BaseURL,
+		h.config.BaseURL,
+		h.generateAuthEndpoints(),
+		h.generateTokenEndpoints(),
+		h.generateDeviceFlowEndpoints(),
+		h.generateClientMgmtEndpoints(),
+	)
 
-    w.Header().Set("Content-Type", "text/html; charset=utf-8")
-    w.Write([]byte(html))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(html))
 }
 
 // generateAuthEndpoints creates HTML for authentication endpoints
 func (h *DocsHandler) generateAuthEndpoints() string {
-    return `
+	return `
         <div class="endpoint">
             <div class="endpoint-header">
                 <span class="method get">GET</span>
@@ -401,7 +401,7 @@ func (h *DocsHandler) generateAuthEndpoints() string {
 
 // generateTokenEndpoints creates HTML for token endpoints
 func (h *DocsHandler) generateTokenEndpoints() string {
-    return `
+	return `
         <div class="endpoint">
             <div class="endpoint-header">
                 <span class="method post">POST</span>
@@ -503,7 +503,7 @@ func (h *DocsHandler) generateTokenEndpoints() string {
 
 // generateDeviceFlowEndpoints creates HTML for device flow endpoints
 func (h *DocsHandler) generateDeviceFlowEndpoints() string {
-    return `
+	return `
         <div class="endpoint">
             <div class="endpoint-header">
                 <span class="method post">POST</span>
@@ -546,7 +546,7 @@ func (h *DocsHandler) generateDeviceFlowEndpoints() string {
 
 // generateClientMgmtEndpoints creates HTML for client management endpoints
 func (h *DocsHandler) generateClientMgmtEndpoints() string {
-    return `
+	return `
         <div class="endpoint">
             <div class="endpoint-header">
                 <span class="method post">POST</span>
@@ -599,69 +599,69 @@ func (h *DocsHandler) generateClientMgmtEndpoints() string {
 
 // serveOpenAPISpec serves an OpenAPI specification
 func (h *DocsHandler) serveOpenAPISpec(w http.ResponseWriter, r *http.Request) {
-    spec := map[string]interface{}{
-        "openapi": "3.0.3",
-        "info": map[string]interface{}{
-            "title":       "OAuth2 Authorization Server",
-            "description": "A comprehensive OAuth2 and OpenID Connect server implementation",
-            "version":     "1.0.0",
-        },
-        "servers": []map[string]interface{}{
-            {"url": h.config.BaseURL, "description": "OAuth2 Server"},
-        },
-        "paths": map[string]interface{}{
-            "/auth": map[string]interface{}{
-                "get": map[string]interface{}{
-                    "summary":     "Authorization Endpoint",
-                    "description": "OAuth2 authorization endpoint for initiating authorization code flow",
-                    "parameters": []map[string]interface{}{
-                        {
-                            "name":        "response_type",
-                            "in":          "query",
-                            "required":    true,
-                            "description": "Response type (code, token, id_token)",
-                            "schema":      map[string]string{"type": "string"},
-                        },
-                        {
-                            "name":        "client_id",
-                            "in":          "query",
-                            "required":    true,
-                            "description": "Client identifier",
-                            "schema":      map[string]string{"type": "string"},
-                        },
-                        {
-                            "name":        "redirect_uri",
-                            "in":          "query",
-                            "required":    false,
-                            "description": "Redirect URI",
-                            "schema":      map[string]string{"type": "string"},
-                        },
-                        {
-                            "name":        "scope",
-                            "in":          "query",
-                            "required":    false,
-                            "description": "Requested scope",
-                            "schema":      map[string]string{"type": "string"},
-                        },
-                        {
-                            "name":        "state",
-                            "in":          "query",
-                            "required":    false,
-                            "description": "State parameter",
-                            "schema":      map[string]string{"type": "string"},
-                        },
-                    },
-                },
-            },
-            "/token": map[string]interface{}{
-                "post": map[string]interface{}{
-                    "summary":     "Token Endpoint",
-                    "description": "OAuth2 token endpoint for exchanging authorization codes for tokens",
-                },
-            },
-        },
-    }
+	spec := map[string]interface{}{
+		"openapi": "3.0.3",
+		"info": map[string]interface{}{
+			"title":       "OAuth2 Authorization Server",
+			"description": "A comprehensive OAuth2 and OpenID Connect server implementation",
+			"version":     "1.0.0",
+		},
+		"servers": []map[string]interface{}{
+			{"url": h.config.BaseURL, "description": "OAuth2 Server"},
+		},
+		"paths": map[string]interface{}{
+			"/auth": map[string]interface{}{
+				"get": map[string]interface{}{
+					"summary":     "Authorization Endpoint",
+					"description": "OAuth2 authorization endpoint for initiating authorization code flow",
+					"parameters": []map[string]interface{}{
+						{
+							"name":        "response_type",
+							"in":          "query",
+							"required":    true,
+							"description": "Response type (code, token, id_token)",
+							"schema":      map[string]string{"type": "string"},
+						},
+						{
+							"name":        "client_id",
+							"in":          "query",
+							"required":    true,
+							"description": "Client identifier",
+							"schema":      map[string]string{"type": "string"},
+						},
+						{
+							"name":        "redirect_uri",
+							"in":          "query",
+							"required":    false,
+							"description": "Redirect URI",
+							"schema":      map[string]string{"type": "string"},
+						},
+						{
+							"name":        "scope",
+							"in":          "query",
+							"required":    false,
+							"description": "Requested scope",
+							"schema":      map[string]string{"type": "string"},
+						},
+						{
+							"name":        "state",
+							"in":          "query",
+							"required":    false,
+							"description": "State parameter",
+							"schema":      map[string]string{"type": "string"},
+						},
+					},
+				},
+			},
+			"/token": map[string]interface{}{
+				"post": map[string]interface{}{
+					"summary":     "Token Endpoint",
+					"description": "OAuth2 token endpoint for exchanging authorization codes for tokens",
+				},
+			},
+		},
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(spec)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(spec)
 }

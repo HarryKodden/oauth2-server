@@ -90,10 +90,10 @@ func TestJoinScopes(t *testing.T) {
 
 func TestFilterScopes(t *testing.T) {
 	tests := []struct {
-		name        string
-		requested   []string
-		allowed     []string
-		expected    []string
+		name      string
+		requested []string
+		allowed   []string
+		expected  []string
 	}{
 		{
 			name:      "all_scopes_allowed",

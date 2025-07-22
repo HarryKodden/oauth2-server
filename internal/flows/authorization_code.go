@@ -16,98 +16,98 @@ import (
 
 // AuthorizationCodeFlow handles the OAuth2 authorization code flow
 type AuthorizationCodeFlow struct {
-    oauth2Provider fosite.OAuth2Provider
-    config         *config.Config
+	oauth2Provider fosite.OAuth2Provider
+	config         *config.Config
 }
 
 // NewAuthorizationCodeFlow creates a new authorization code flow handler
 func NewAuthorizationCodeFlow(oauth2Provider fosite.OAuth2Provider, config *config.Config) *AuthorizationCodeFlow {
-    return &AuthorizationCodeFlow{
-        oauth2Provider: oauth2Provider,
-        config:         config,
-    }
+	return &AuthorizationCodeFlow{
+		oauth2Provider: oauth2Provider,
+		config:         config,
+	}
 }
 
 // HandleAuthorization handles the authorization endpoint
 func (f *AuthorizationCodeFlow) HandleAuthorization(w http.ResponseWriter, r *http.Request) {
-    ctx := context.Background()
-    
-    log.Printf("🔄 Authorization request: %s %s", r.Method, r.URL.String())
-    log.Printf("🔍 Query parameters: %+v", r.URL.Query())
+	ctx := context.Background()
 
-    // Create a new authorization request object and catch any errors
-    ar, err := f.oauth2Provider.NewAuthorizeRequest(ctx, r)
-    if err != nil {
-        log.Printf("❌ Error creating authorization request: %v", err)
-        f.oauth2Provider.WriteAuthorizeError(ctx, w, ar, err)
-        return
-    }
-    
-    log.Printf("✅ Authorization request created successfully for client: %s", ar.GetClient().GetID())
+	log.Printf("🔄 Authorization request: %s %s", r.Method, r.URL.String())
+	log.Printf("🔍 Query parameters: %+v", r.URL.Query())
 
-    // Check if this is a login form submission
-    if r.Method == "POST" && r.FormValue("action") == "login" {
-        f.handleLogin(w, r, ar)
-        return
-    }
+	// Create a new authorization request object and catch any errors
+	ar, err := f.oauth2Provider.NewAuthorizeRequest(ctx, r)
+	if err != nil {
+		log.Printf("❌ Error creating authorization request: %v", err)
+		f.oauth2Provider.WriteAuthorizeError(ctx, w, ar, err)
+		return
+	}
 
-    // Check if user is already authenticated via session or basic auth
-    var userID string
-    
-    // Try to get authenticated user from basic auth (for testing)
-    if username, password, ok := r.BasicAuth(); ok {
-        if user := f.authenticateUser(username, password); user != nil {
-            userID = user.ID
-        }
-    }
+	log.Printf("✅ Authorization request created successfully for client: %s", ar.GetClient().GetID())
 
-    // If no user authenticated, show login form
-    if userID == "" {
-        f.showLoginForm(w, r, ar)
-        return
-    }
+	// Check if this is a login form submission
+	if r.Method == "POST" && r.FormValue("action") == "login" {
+		f.handleLogin(w, r, ar)
+		return
+	}
 
-    // Check if this is a consent form submission
-    if r.Method == "POST" && r.FormValue("action") == "consent" {
-        f.handleConsent(w, r, ar, userID)
-        return
-    }
+	// Check if user is already authenticated via session or basic auth
+	var userID string
 
-    // Show consent form
-    f.showConsentForm(w, r, ar, userID)
+	// Try to get authenticated user from basic auth (for testing)
+	if username, password, ok := r.BasicAuth(); ok {
+		if user := f.authenticateUser(username, password); user != nil {
+			userID = user.ID
+		}
+	}
+
+	// If no user authenticated, show login form
+	if userID == "" {
+		f.showLoginForm(w, r, ar)
+		return
+	}
+
+	// Check if this is a consent form submission
+	if r.Method == "POST" && r.FormValue("action") == "consent" {
+		f.handleConsent(w, r, ar, userID)
+		return
+	}
+
+	// Show consent form
+	f.showConsentForm(w, r, ar, userID)
 }
 
 // handleLogin processes the login form submission
 func (f *AuthorizationCodeFlow) handleLogin(w http.ResponseWriter, r *http.Request, ar fosite.AuthorizeRequester) {
-    username := r.FormValue("username")
-    password := r.FormValue("password")
+	username := r.FormValue("username")
+	password := r.FormValue("password")
 
-    // Authenticate the user
-    user := f.authenticateUser(username, password)
-    if user == nil {
-        // Authentication failed - show login form with error
-        f.showLoginFormWithError(w, r, ar, "Invalid username or password")
-        return
-    }
+	// Authenticate the user
+	user := f.authenticateUser(username, password)
+	if user == nil {
+		// Authentication failed - show login form with error
+		f.showLoginFormWithError(w, r, ar, "Invalid username or password")
+		return
+	}
 
-    // Authentication successful - show consent form
-    f.showConsentForm(w, r, ar, user.ID)
+	// Authentication successful - show consent form
+	f.showConsentForm(w, r, ar, user.ID)
 }
 
 // showLoginFormWithError displays the login form with an error message
 func (f *AuthorizationCodeFlow) showLoginFormWithError(w http.ResponseWriter, r *http.Request, ar fosite.AuthorizeRequester, errorMsg string) {
-    // Create query string to preserve authorization request parameters
-    query := r.URL.RawQuery
-    if query != "" {
-        query = "?" + query
-    }
+	// Create query string to preserve authorization request parameters
+	query := r.URL.RawQuery
+	if query != "" {
+		query = "?" + query
+	}
 
-    errorHTML := ""
-    if errorMsg != "" {
-        errorHTML = fmt.Sprintf(`<div class="error">❌ %s</div>`, errorMsg)
-    }
+	errorHTML := ""
+	if errorMsg != "" {
+		errorHTML = fmt.Sprintf(`<div class="error">❌ %s</div>`, errorMsg)
+	}
 
-    loginHTML := `<!DOCTYPE html>
+	loginHTML := `<!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
@@ -160,65 +160,65 @@ func (f *AuthorizationCodeFlow) showLoginFormWithError(w http.ResponseWriter, r 
 </body>
 </html>`
 
-    w.Header().Set("Content-Type", "text/html; charset=utf-8")
-    w.WriteHeader(http.StatusOK)
-    w.Write([]byte(loginHTML))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(loginHTML))
 }
 
 // authenticateUser validates user credentials against the configured users
 func (f *AuthorizationCodeFlow) authenticateUser(username, password string) *config.User {
-    // Look up user in the configuration
-    if user, found := f.config.GetUserByUsername(username); found {
-        // In a real implementation, you'd hash and compare passwords properly
-        if user.Password == password {
-            return user
-        }
-    }
-    return nil
+	// Look up user in the configuration
+	if user, found := f.config.GetUserByUsername(username); found {
+		// In a real implementation, you'd hash and compare passwords properly
+		if user.Password == password {
+			return user
+		}
+	}
+	return nil
 }
 
 // showLoginForm displays the login form
 func (f *AuthorizationCodeFlow) showLoginForm(w http.ResponseWriter, r *http.Request, ar fosite.AuthorizeRequester) {
-    f.showLoginFormWithError(w, r, ar, "")
+	f.showLoginFormWithError(w, r, ar, "")
 }
 
 // generateTestUsersList creates an HTML list of available test users
 func (f *AuthorizationCodeFlow) generateTestUsersList() string {
-    var usersList strings.Builder
-    
-    for _, user := range f.config.Users {
-        usersList.WriteString(fmt.Sprintf(
-            "<li><strong>%s</strong> / %s (%s)</li>",
-            user.Username,
-            user.Password,
-            user.Name,
-        ))
-    }
-    
-    if usersList.Len() == 0 {
-        usersList.WriteString("<li>No test users configured</li>")
-    }
-    
-    return usersList.String()
+	var usersList strings.Builder
+
+	for _, user := range f.config.Users {
+		usersList.WriteString(fmt.Sprintf(
+			"<li><strong>%s</strong> / %s (%s)</li>",
+			user.Username,
+			user.Password,
+			user.Name,
+		))
+	}
+
+	if usersList.Len() == 0 {
+		usersList.WriteString("<li>No test users configured</li>")
+	}
+
+	return usersList.String()
 }
 
 // showConsentForm displays the consent form
 func (f *AuthorizationCodeFlow) showConsentForm(w http.ResponseWriter, r *http.Request, ar fosite.AuthorizeRequester, userID string) {
-    // Create query string to preserve authorization request parameters
-    query := r.URL.RawQuery
-    if query != "" {
-        query = "?" + query
-    }
+	// Create query string to preserve authorization request parameters
+	query := r.URL.RawQuery
+	if query != "" {
+		query = "?" + query
+	}
 
-    // Get user information
-    var userName string
-    if user, found := f.config.GetUserByUsername(userID); found {
-        userName = user.Name
-    } else {
-        userName = userID
-    }
+	// Get user information
+	var userName string
+	if user, found := f.config.GetUserByUsername(userID); found {
+		userName = user.Name
+	} else {
+		userName = userID
+	}
 
-    consentHTML := fmt.Sprintf(`
+	consentHTML := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -263,121 +263,121 @@ func (f *AuthorizationCodeFlow) showConsentForm(w http.ResponseWriter, r *http.R
     </div>
 </body>
 </html>`,
-        userName,
-        ar.GetClient().GetID(),
-        f.generateScopesList(ar.GetRequestedScopes()),
-        query,
-        userID,
-    )
+		userName,
+		ar.GetClient().GetID(),
+		f.generateScopesList(ar.GetRequestedScopes()),
+		query,
+		userID,
+	)
 
-    w.Header().Set("Content-Type", "text/html; charset=utf-8")
-    w.WriteHeader(http.StatusOK)
-    w.Write([]byte(consentHTML))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(consentHTML))
 }
 
 // generateScopesList creates an HTML list of requested scopes
 func (f *AuthorizationCodeFlow) generateScopesList(scopes []string) string {
-    scopeDescriptions := map[string]string{
-        "openid":     "Verify your identity",
-        "profile":    "Access your basic profile information",
-        "email":      "Access your email address",
-        "api:read":   "Read access to API resources",
-        "api:write":  "Write access to API resources",
-        "api:admin":  "Administrative access to API resources",
-        "offline":    "Access your data when you're not actively using the app",
-    }
+	scopeDescriptions := map[string]string{
+		"openid":    "Verify your identity",
+		"profile":   "Access your basic profile information",
+		"email":     "Access your email address",
+		"api:read":  "Read access to API resources",
+		"api:write": "Write access to API resources",
+		"api:admin": "Administrative access to API resources",
+		"offline":   "Access your data when you're not actively using the app",
+	}
 
-    var scopesList strings.Builder
-    for _, scope := range scopes {
-        description := scopeDescriptions[scope]
-        if description == "" {
-            description = fmt.Sprintf("Access to %s", scope)
-        }
-        scopesList.WriteString(fmt.Sprintf("<li><strong>%s:</strong> %s</li>", scope, description))
-    }
+	var scopesList strings.Builder
+	for _, scope := range scopes {
+		description := scopeDescriptions[scope]
+		if description == "" {
+			description = fmt.Sprintf("Access to %s", scope)
+		}
+		scopesList.WriteString(fmt.Sprintf("<li><strong>%s:</strong> %s</li>", scope, description))
+	}
 
-    return scopesList.String()
+	return scopesList.String()
 }
 
 // handleConsent processes the consent form submission
 func (f *AuthorizationCodeFlow) handleConsent(w http.ResponseWriter, r *http.Request, ar fosite.AuthorizeRequester, userID string) {
-    ctx := context.Background()
+	ctx := context.Background()
 
-    // Check if user consented
-    consent := r.FormValue("consent")
-    if consent != "allow" {
-        // User denied consent
-        err := fosite.ErrAccessDenied.WithHint("The user denied the request.")
-        f.oauth2Provider.WriteAuthorizeError(ctx, w, ar, err)
-        return
-    }
+	// Check if user consented
+	consent := r.FormValue("consent")
+	if consent != "allow" {
+		// User denied consent
+		err := fosite.ErrAccessDenied.WithHint("The user denied the request.")
+		f.oauth2Provider.WriteAuthorizeError(ctx, w, ar, err)
+		return
+	}
 
-    // Get the username for the session
-    var username string
-    if user, found := f.config.GetUserByUsername(userID); found {
-        username = user.Username
-    } else {
-        username = userID
-    }
+	// Get the username for the session
+	var username string
+	if user, found := f.config.GetUserByUsername(userID); found {
+		username = user.Username
+	} else {
+		username = userID
+	}
 
-    // Create a new session that implements fosite.Session
-    mySessionData := &auth.UserSession{
-        UserID:   userID,
-        Username: username,
-        Subject:  userID,
-    }
+	// Create a new session that implements fosite.Session
+	mySessionData := &auth.UserSession{
+		UserID:   userID,
+		Username: username,
+		Subject:  userID,
+	}
 
-    // Generate the authorization code response
-    response, err := f.oauth2Provider.NewAuthorizeResponse(ctx, ar, mySessionData)
-    if err != nil {
-        log.Printf("❌ Error creating authorization response: %v", err)
-        f.oauth2Provider.WriteAuthorizeError(ctx, w, ar, err)
-        return
-    }
+	// Generate the authorization code response
+	response, err := f.oauth2Provider.NewAuthorizeResponse(ctx, ar, mySessionData)
+	if err != nil {
+		log.Printf("❌ Error creating authorization response: %v", err)
+		f.oauth2Provider.WriteAuthorizeError(ctx, w, ar, err)
+		return
+	}
 
-    // Redirect the user back to the client with the authorization code
-    f.oauth2Provider.WriteAuthorizeResponse(ctx, w, ar, response)
-    
-    log.Printf("✅ Authorization code issued for user %s, client %s", userID, ar.GetClient().GetID())
+	// Redirect the user back to the client with the authorization code
+	f.oauth2Provider.WriteAuthorizeResponse(ctx, w, ar, response)
+
+	log.Printf("✅ Authorization code issued for user %s, client %s", userID, ar.GetClient().GetID())
 }
 
 // HandleCallback handles the authorization callback (typically not used in auth code flow)
 func (f *AuthorizationCodeFlow) HandleCallback(w http.ResponseWriter, r *http.Request) {
-    // Parse query parameters
-    code := r.URL.Query().Get("code")
-    state := r.URL.Query().Get("state")
-    errorParam := r.URL.Query().Get("error")
+	// Parse query parameters
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+	errorParam := r.URL.Query().Get("error")
 
-    if errorParam != "" {
-        errorDescription := r.URL.Query().Get("error_description")
-        content := fmt.Sprintf(`
+	if errorParam != "" {
+		errorDescription := r.URL.Query().Get("error_description")
+		content := fmt.Sprintf(`
             <h2>❌ Authorization Error</h2>
             <p><strong>Error:</strong> %s</p>
             <p><strong>Description:</strong> %s</p>
             <p><strong>State:</strong> %s</p>
         `, errorParam, errorDescription, state)
-        utils.WriteHTMLResponse(w, http.StatusBadRequest, content)
-        return
-    }
+		utils.WriteHTMLResponse(w, http.StatusBadRequest, content)
+		return
+	}
 
-    if code == "" {
-        content := `
+	if code == "" {
+		content := `
             <h2>❌ Missing Authorization Code</h2>
             <p>No authorization code received in callback.</p>
         `
-        utils.WriteHTMLResponse(w, http.StatusBadRequest, content)
-        return
-    }
+		utils.WriteHTMLResponse(w, http.StatusBadRequest, content)
+		return
+	}
 
-    // Display successful callback
-    content := fmt.Sprintf(`
+	// Display successful callback
+	content := fmt.Sprintf(`
         <h2>✅ Authorization Successful</h2>
         <p><strong>Authorization Code:</strong></p>
         <div class="code">%s</div>
         <p><strong>State:</strong> %s</p>
         <p>You can now exchange this code for an access token at the token endpoint.</p>
     `, code, state)
-    utils.WriteHTMLResponse(w, http.StatusOK, content)
+	utils.WriteHTMLResponse(w, http.StatusOK, content)
 
-    log.Printf("✅ Authorization callback received: code=%s, state=%s", code, state)
+	log.Printf("✅ Authorization callback received: code=%s, state=%s", code, state)
 }

@@ -228,16 +228,16 @@ func (cs *ClientStore) LoadClientsFromConfig(clients []config.ClientConfig) erro
 		client := &Client{
 			ID:                      clientConfig.ID,
 			Secret:                  hashedSecret,
-			Name:                   clientConfig.Name,
-			Description:            clientConfig.Description,
-			RedirectURIs:           clientConfig.RedirectURIs,
-			GrantTypes:             clientConfig.GrantTypes,
-			ResponseTypes:          clientConfig.ResponseTypes,
-			Scopes:                 clientConfig.Scopes,
-			Audience:               clientConfig.Audience,
+			Name:                    clientConfig.Name,
+			Description:             clientConfig.Description,
+			RedirectURIs:            clientConfig.RedirectURIs,
+			GrantTypes:              clientConfig.GrantTypes,
+			ResponseTypes:           clientConfig.ResponseTypes,
+			Scopes:                  clientConfig.Scopes,
+			Audience:                clientConfig.Audience,
 			TokenEndpointAuthMethod: clientConfig.TokenEndpointAuthMethod,
-			Public:                 clientConfig.Public,
-			EnabledFlows:           clientConfig.EnabledFlows,
+			Public:                  clientConfig.Public,
+			EnabledFlows:            clientConfig.EnabledFlows,
 		}
 
 		cs.clients[clientConfig.ID] = client

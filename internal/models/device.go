@@ -4,18 +4,18 @@ import "time"
 
 // DeviceAuthorization represents a device authorization request
 type DeviceAuthorization struct {
-	DeviceCode      string    `json:"device_code"`
-	UserCode        string    `json:"user_code"`
-	ClientID        string    `json:"client_id"`
-	Scopes          []string  `json:"scopes"`
-	ExpiresAt       time.Time `json:"expires_at"`
-	IssuedAt        time.Time `json:"issued_at"`
-	Authorized      bool      `json:"authorized"`
-	UserID          string    `json:"user_id,omitempty"`
-	AccessToken     string    `json:"access_token,omitempty"`
-	RefreshToken    string    `json:"refresh_token,omitempty"`
-	TokenType       string    `json:"token_type,omitempty"`
-	Used            bool      `json:"used"`
+	DeviceCode   string    `json:"device_code"`
+	UserCode     string    `json:"user_code"`
+	ClientID     string    `json:"client_id"`
+	Scopes       []string  `json:"scopes"`
+	ExpiresAt    time.Time `json:"expires_at"`
+	IssuedAt     time.Time `json:"issued_at"`
+	Authorized   bool      `json:"authorized"`
+	UserID       string    `json:"user_id,omitempty"`
+	AccessToken  string    `json:"access_token,omitempty"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
+	TokenType    string    `json:"token_type,omitempty"`
+	Used         bool      `json:"used"`
 }
 
 // IsExpired checks if the device authorization has expired

@@ -38,11 +38,11 @@ var (
 	tokenStore     *store.TokenStore
 
 	// OAuth2 flows
-	authCodeFlow       *flows.AuthorizationCodeFlow
-	clientCredsFlow    *flows.ClientCredentialsFlow
-	refreshTokenFlow   *flows.RefreshTokenFlow
-	tokenExchangeFlow  *flows.TokenExchangeFlow
-	deviceCodeFlow     *flows.DeviceCodeFlow
+	authCodeFlow      *flows.AuthorizationCodeFlow
+	clientCredsFlow   *flows.ClientCredentialsFlow
+	refreshTokenFlow  *flows.RefreshTokenFlow
+	tokenExchangeFlow *flows.TokenExchangeFlow
+	deviceCodeFlow    *flows.DeviceCodeFlow
 
 	// Documentation handler
 	docsHandler *handlers.DocsHandler
@@ -70,7 +70,7 @@ func main() {
 
 	// Load configuration from YAML
 	var err error
-	cfg, err = config.NewConfig()  // Use = instead of := to set the global variable
+	cfg, err = config.NewConfig() // Use = instead of := to set the global variable
 	if err != nil {
 		log.Fatalf("❌ Failed to load configuration: %v", err)
 	}
@@ -81,8 +81,8 @@ func main() {
 	}
 
 	// Access logging configuration correctly:
-	logLevel := cfg.Logging.Level        // ✅ Correct
-	logFormat := cfg.Logging.Format      // ✅ Correct
+	logLevel := cfg.Logging.Level          // ✅ Correct
+	logFormat := cfg.Logging.Format        // ✅ Correct
 	enableAudit := cfg.Logging.EnableAudit // ✅ Correct
 
 	// Initialize logger based on config
@@ -159,22 +159,22 @@ func initializeOAuth2Provider() error {
 
 	// Create memory store for non-client data (sessions, codes, etc.)
 	memoryStore := storage.NewMemoryStore()
-	
+
 	// Create a composite store that uses our clientStore for clients
 	// and memoryStore for everything else
 	compositeStore := &CompositeStore{
-		ClientStore:  clientStore,
-		MemoryStore:  memoryStore,
+		ClientStore: clientStore,
+		MemoryStore: memoryStore,
 	}
 
 	// Configure OAuth2 provider
 	config := &fosite.Config{
-		AccessTokenLifespan:   time.Hour,
-		RefreshTokenLifespan:  time.Hour * 24 * 30,
-		AuthorizeCodeLifespan: time.Minute * 10,
-		GlobalSecret:          []byte(cfg.Security.JWTSecret + "-padded-to-32-bytes-for-hmac-security"), // Ensure adequate length
-		AccessTokenIssuer:     cfg.Server.BaseURL,
-		ScopeStrategy:         fosite.HierarchicScopeStrategy,
+		AccessTokenLifespan:      time.Hour,
+		RefreshTokenLifespan:     time.Hour * 24 * 30,
+		AuthorizeCodeLifespan:    time.Minute * 10,
+		GlobalSecret:             []byte(cfg.Security.JWTSecret + "-padded-to-32-bytes-for-hmac-security"), // Ensure adequate length
+		AccessTokenIssuer:        cfg.Server.BaseURL,
+		ScopeStrategy:            fosite.HierarchicScopeStrategy,
 		AudienceMatchingStrategy: fosite.DefaultAudienceMatchingStrategy,
 	}
 
@@ -441,7 +441,7 @@ func handleDeviceVerification(w http.ResponseWriter, r *http.Request) {
 
 	// Normalize user code - trim, uppercase, and ensure consistent formatting
 	userCode = strings.TrimSpace(strings.ToUpper(userCode))
-	
+
 	// Validate user code format
 	if err := utils.ValidateUserCode(userCode); err != nil {
 		http.Redirect(w, r, "/device?error=Invalid user code format", http.StatusFound)
@@ -563,19 +563,19 @@ func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
 
 	wellKnown := map[string]interface{}{
 		// OAuth2 Authorization Server Metadata (RFC 8414)
-		"issuer":                                baseURL,
-		"authorization_endpoint":                baseURL + "/auth",
-		"token_endpoint":                        baseURL + "/token",
-		"userinfo_endpoint":                     baseURL + "/userinfo",
-		"jwks_uri":                              baseURL + "/.well-known/jwks.json",
-		"registration_endpoint":                 baseURL + "/register",
-		"revocation_endpoint":                   baseURL + "/revoke",
-		"introspection_endpoint":                baseURL + "/introspect",
+		"issuer":                 baseURL,
+		"authorization_endpoint": baseURL + "/auth",
+		"token_endpoint":         baseURL + "/token",
+		"userinfo_endpoint":      baseURL + "/userinfo",
+		"jwks_uri":               baseURL + "/.well-known/jwks.json",
+		"registration_endpoint":  baseURL + "/register",
+		"revocation_endpoint":    baseURL + "/revoke",
+		"introspection_endpoint": baseURL + "/introspect",
 
 		// Device Flow (RFC 8628)
-		"device_authorization_endpoint":         baseURL + "/device_authorization",
-		"device_verification_uri":               baseURL + "/device",
-		"device_verification_uri_complete":      baseURL + "/device?user_code={user_code}",
+		"device_authorization_endpoint":    baseURL + "/device_authorization",
+		"device_verification_uri":          baseURL + "/device",
+		"device_verification_uri_complete": baseURL + "/device?user_code={user_code}",
 
 		// Supported scopes
 		"scopes_supported": []string{
@@ -657,18 +657,18 @@ func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
 			"updated_at",
 		},
 
-		"claims_parameter_supported":                true,
-		"request_parameter_supported":               true,
-		"request_uri_parameter_supported":           false,
-		"require_request_uri_registration":          false,
-		"claims_locales_supported":                  []string{"en-US", "en-GB", "de-DE", "fr-FR"},
-		"ui_locales_supported":                      []string{"en-US", "en-GB", "de-DE", "fr-FR"},
-		"display_values_supported":                  []string{"page", "popup", "touch", "wap"},
-		"acr_values_supported":                      []string{"0", "1", "2"},
-		"frontchannel_logout_supported":             true,
-		"frontchannel_logout_session_supported":    true,
-		"backchannel_logout_supported":              false,
-		"backchannel_logout_session_supported":     false,
+		"claims_parameter_supported":            true,
+		"request_parameter_supported":           true,
+		"request_uri_parameter_supported":       false,
+		"require_request_uri_registration":      false,
+		"claims_locales_supported":              []string{"en-US", "en-GB", "de-DE", "fr-FR"},
+		"ui_locales_supported":                  []string{"en-US", "en-GB", "de-DE", "fr-FR"},
+		"display_values_supported":              []string{"page", "popup", "touch", "wap"},
+		"acr_values_supported":                  []string{"0", "1", "2"},
+		"frontchannel_logout_supported":         true,
+		"frontchannel_logout_session_supported": true,
+		"backchannel_logout_supported":          false,
+		"backchannel_logout_session_supported":  false,
 
 		// Additional OAuth2 features
 		"introspection_endpoint_auth_methods_supported": []string{
@@ -686,8 +686,8 @@ func wellKnownHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Custom extensions with proxy-aware URLs
 		"service_documentation": baseURL + "/docs",
-		"op_policy_uri":        baseURL + "/policy",
-		"op_tos_uri":           baseURL + "/terms",
+		"op_policy_uri":         baseURL + "/policy",
+		"op_tos_uri":            baseURL + "/terms",
 	}
 
 	json.NewEncoder(w).Encode(wellKnown)
@@ -832,7 +832,7 @@ func client1AuthHandler(w http.ResponseWriter, r *http.Request) {
 	// Find the first client from configuration or use default
 	var clientID string
 	var redirectURI string
-	
+
 	if len(cfg.Clients) > 0 {
 		client := cfg.Clients[0]
 		clientID = client.ID
@@ -964,96 +964,96 @@ func getRequestBaseURL(r *http.Request) string {
 
 // Add token revocation handler
 func revokeHandler(w http.ResponseWriter, r *http.Request) {
-    if r.Method != "POST" {
-        utils.WriteMethodNotAllowedError(w)
-        return
-    }
+	if r.Method != "POST" {
+		utils.WriteMethodNotAllowedError(w)
+		return
+	}
 
-    if err := r.ParseForm(); err != nil {
-        utils.WriteInvalidRequestError(w, "Failed to parse request")
-        return
-    }
+	if err := r.ParseForm(); err != nil {
+		utils.WriteInvalidRequestError(w, "Failed to parse request")
+		return
+	}
 
-    token := r.FormValue("token")
-    if token == "" {
-        utils.WriteInvalidRequestError(w, "Token parameter is required")
-        return
-    }
+	token := r.FormValue("token")
+	if token == "" {
+		utils.WriteInvalidRequestError(w, "Token parameter is required")
+		return
+	}
 
-    // Extract client credentials
-    clientID, clientSecret, err := auth.ExtractClientCredentials(r)
-    if err != nil {
-        utils.WriteInvalidClientError(w, "Client authentication required")
-        return
-    }
+	// Extract client credentials
+	clientID, clientSecret, err := auth.ExtractClientCredentials(r)
+	if err != nil {
+		utils.WriteInvalidClientError(w, "Client authentication required")
+		return
+	}
 
-    // Authenticate client
-    if err := clientStore.ValidateClientCredentials(clientID, clientSecret); err != nil {
-        utils.WriteInvalidClientError(w, "Client authentication failed")
-        return
-    }
+	// Authenticate client
+	if err := clientStore.ValidateClientCredentials(clientID, clientSecret); err != nil {
+		utils.WriteInvalidClientError(w, "Client authentication failed")
+		return
+	}
 
-    // For demo purposes, just return success
-    // In a real implementation, you'd revoke the token from your token store
-    w.WriteHeader(http.StatusOK)
-    log.Printf("✅ Token revoked for client: %s", clientID)
+	// For demo purposes, just return success
+	// In a real implementation, you'd revoke the token from your token store
+	w.WriteHeader(http.StatusOK)
+	log.Printf("✅ Token revoked for client: %s", clientID)
 }
 
 // Add token introspection handler
 func introspectHandler(w http.ResponseWriter, r *http.Request) {
-    if r.Method != "POST" {
-        utils.WriteMethodNotAllowedError(w)
-        return
-    }
+	if r.Method != "POST" {
+		utils.WriteMethodNotAllowedError(w)
+		return
+	}
 
-    if err := r.ParseForm(); err != nil {
-        utils.WriteInvalidRequestError(w, "Failed to parse request")
-        return
-    }
+	if err := r.ParseForm(); err != nil {
+		utils.WriteInvalidRequestError(w, "Failed to parse request")
+		return
+	}
 
-    token := r.FormValue("token")
-    if token == "" {
-        utils.WriteInvalidRequestError(w, "Token parameter is required")
-        return
-    }
+	token := r.FormValue("token")
+	if token == "" {
+		utils.WriteInvalidRequestError(w, "Token parameter is required")
+		return
+	}
 
-    // Extract client credentials
-    clientID, clientSecret, err := auth.ExtractClientCredentials(r)
-    if err != nil {
-        utils.WriteInvalidClientError(w, "Client authentication required")
-        return
-    }
+	// Extract client credentials
+	clientID, clientSecret, err := auth.ExtractClientCredentials(r)
+	if err != nil {
+		utils.WriteInvalidClientError(w, "Client authentication required")
+		return
+	}
 
-    // Authenticate client
-    if err := clientStore.ValidateClientCredentials(clientID, clientSecret); err != nil {
-        utils.WriteInvalidClientError(w, "Client authentication failed")
-        return
-    }
+	// Authenticate client
+	if err := clientStore.ValidateClientCredentials(clientID, clientSecret); err != nil {
+		utils.WriteInvalidClientError(w, "Client authentication failed")
+		return
+	}
 
-    // Get user information (use first user or default)
-    var userID string
-    if len(cfg.Users) > 0 {
-        userID = cfg.Users[0].ID
-    } else {
-        userID = "default-user"
-    }
+	// Get user information (use first user or default)
+	var userID string
+	if len(cfg.Users) > 0 {
+		userID = cfg.Users[0].ID
+	} else {
+		userID = "default-user"
+	}
 
-    // For demo purposes, return a basic introspection response
-    introspectionResponse := map[string]interface{}{
-        "active":     true,
-        "client_id":  clientID,
-        "token_type": "Bearer",
-        "scope":      "api:read api:write",
-        "exp":        time.Now().Add(time.Hour).Unix(),
-        "iat":        time.Now().Unix(),
-        "sub":        userID,
-        "aud":        []string{"api-service"},
-        "iss":        cfg.Server.BaseURL,
-    }
+	// For demo purposes, return a basic introspection response
+	introspectionResponse := map[string]interface{}{
+		"active":     true,
+		"client_id":  clientID,
+		"token_type": "Bearer",
+		"scope":      "api:read api:write",
+		"exp":        time.Now().Add(time.Hour).Unix(),
+		"iat":        time.Now().Unix(),
+		"sub":        userID,
+		"aud":        []string{"api-service"},
+		"iss":        cfg.Server.BaseURL,
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(introspectionResponse)
-    log.Printf("✅ Token introspected for client: %s", clientID)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(introspectionResponse)
+	log.Printf("✅ Token introspected for client: %s", clientID)
 }
 
 // Example placeholder handlers for unimplemented flows

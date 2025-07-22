@@ -9,10 +9,10 @@ import (
 
 // WriteHTMLResponse writes an HTML response with the given status code and content
 func WriteHTMLResponse(w http.ResponseWriter, statusCode int, content string) {
-    w.Header().Set("Content-Type", "text/html; charset=utf-8")
-    w.WriteHeader(statusCode)
-    
-    html := fmt.Sprintf(`
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(statusCode)
+
+	html := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
 <head>
@@ -68,53 +68,53 @@ func WriteHTMLResponse(w http.ResponseWriter, statusCode int, content string) {
     </div>
 </body>
 </html>`, content)
-    
-    w.Write([]byte(html))
+
+	w.Write([]byte(html))
 }
 
 // WriteJSONResponse writes a JSON response with the given status code and data
 func WriteJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(statusCode)
-    if err := json.NewEncoder(w).Encode(data); err != nil {
-        log.Printf("❌ Error encoding JSON response: %v", err)
-    }
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("❌ Error encoding JSON response: %v", err)
+	}
 }
 
 // WriteTextResponse writes a plain text response
 func WriteTextResponse(w http.ResponseWriter, statusCode int, text string) {
-    w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-    w.WriteHeader(statusCode)
-    w.Write([]byte(text))
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(statusCode)
+	w.Write([]byte(text))
 }
 
 // WriteErrorHTML writes an HTML error response
 func WriteErrorHTML(w http.ResponseWriter, statusCode int, title, message string) {
-    content := fmt.Sprintf(`
+	content := fmt.Sprintf(`
         <h2 class="error">❌ %s</h2>
         <p>%s</p>
         <p><small>Status Code: %d</small></p>
     `, title, message, statusCode)
-    
-    WriteHTMLResponse(w, statusCode, content)
+
+	WriteHTMLResponse(w, statusCode, content)
 }
 
 // WriteSuccessHTML writes an HTML success response
 func WriteSuccessHTML(w http.ResponseWriter, title, message string) {
-    content := fmt.Sprintf(`
+	content := fmt.Sprintf(`
         <h2 class="success">✅ %s</h2>
         <p>%s</p>
     `, title, message)
-    
-    WriteHTMLResponse(w, http.StatusOK, content)
+
+	WriteHTMLResponse(w, http.StatusOK, content)
 }
 
 // WriteInfoHTML writes an HTML info response
 func WriteInfoHTML(w http.ResponseWriter, title, message string) {
-    content := fmt.Sprintf(`
+	content := fmt.Sprintf(`
         <h2 class="info">ℹ️ %s</h2>
         <p>%s</p>
     `, title, message)
-    
-    WriteHTMLResponse(w, http.StatusOK, content)
+
+	WriteHTMLResponse(w, http.StatusOK, content)
 }

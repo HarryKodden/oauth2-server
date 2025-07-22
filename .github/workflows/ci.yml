@@ -38,11 +38,21 @@ jobs:
 
       - name: Check formatting
         run: |
-          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
-            echo "Code is not formatted properly:"
-            gofmt -s -l .
+          UNFORMATTED=$(gofmt -s -l .)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "❌ The following files are not formatted properly:"
+            echo "$UNFORMATTED"
+            echo ""
+            echo "To fix this, run locally:"
+            echo "  make fmt"
+            echo "  git add ."
+            echo "  git commit -m 'Format code'"
+            echo "  git push"
+            echo ""
+            echo "Or run: gofmt -s -w ."
             exit 1
           fi
+          echo "✅ All files are properly formatted"
 
       - name: Run vet
         run: go vet ./...

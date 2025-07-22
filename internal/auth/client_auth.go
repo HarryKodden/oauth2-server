@@ -34,41 +34,41 @@ func AuthenticateClient(clientID, clientSecret string, clientStore *store.Client
 
 // ExtractClientCredentials extracts client credentials from request
 func ExtractClientCredentials(r *http.Request) (string, string, error) {
-    // Check for Basic Authentication in Authorization header
-    authHeader := r.Header.Get("Authorization")
-    if authHeader != "" {
-        parts := strings.SplitN(authHeader, " ", 2)
-        if len(parts) == 2 && parts[0] == "Basic" {
-            // Decode Basic auth
-            payload, err := base64.StdEncoding.DecodeString(parts[1])
-            if err != nil {
-                return "", "", errors.New("invalid basic auth encoding")
-            }
-            
-            // Split username:password
-            creds := strings.SplitN(string(payload), ":", 2)
-            if len(creds) != 2 {
-                return "", "", errors.New("invalid basic auth format")
-            }
-            
-            return creds[0], creds[1], nil
-        }
-    }
-    
-    // Check for client credentials in request body
-    if err := r.ParseForm(); err != nil {
-        return "", "", errors.New("failed to parse form")
-    }
-    
-    clientID := r.FormValue("client_id")
-    clientSecret := r.FormValue("client_secret")
-    
-    if clientID == "" {
-        return "", "", errors.New("client_id is required")
-    }
-    
-    // Some flows allow public clients (no secret required)
-    return clientID, clientSecret, nil
+	// Check for Basic Authentication in Authorization header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) == 2 && parts[0] == "Basic" {
+			// Decode Basic auth
+			payload, err := base64.StdEncoding.DecodeString(parts[1])
+			if err != nil {
+				return "", "", errors.New("invalid basic auth encoding")
+			}
+
+			// Split username:password
+			creds := strings.SplitN(string(payload), ":", 2)
+			if len(creds) != 2 {
+				return "", "", errors.New("invalid basic auth format")
+			}
+
+			return creds[0], creds[1], nil
+		}
+	}
+
+	// Check for client credentials in request body
+	if err := r.ParseForm(); err != nil {
+		return "", "", errors.New("failed to parse form")
+	}
+
+	clientID := r.FormValue("client_id")
+	clientSecret := r.FormValue("client_secret")
+
+	if clientID == "" {
+		return "", "", errors.New("client_id is required")
+	}
+
+	// Some flows allow public clients (no secret required)
+	return clientID, clientSecret, nil
 }
 
 // extractBasicAuth extracts credentials from Basic authentication header

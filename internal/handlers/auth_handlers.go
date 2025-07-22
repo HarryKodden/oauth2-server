@@ -40,10 +40,10 @@ func (h *AuthHandler) HandleClientAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response := models.ClientAuthResponse{
-		ClientID:     client.GetID(),
-		Scopes:       client.GetScopes(),
-		GrantTypes:   client.GetGrantTypes(),
-		Audience:     client.GetAudience(),
+		ClientID:      client.GetID(),
+		Scopes:        client.GetScopes(),
+		GrantTypes:    client.GetGrantTypes(),
+		Audience:      client.GetAudience(),
 		Authenticated: true,
 	}
 
@@ -129,7 +129,7 @@ func (h *AuthHandler) HandleIntrospection(w http.ResponseWriter, r *http.Request
 			TokenType: "Bearer",
 			Scope:     "api:read api:write",
 			ClientID:  clientID,
-			Username:  "user123", // This would come from token claims in real implementation
+			Username:  "user123",  // This would come from token claims in real implementation
 			Exp:       1234567890, // This would come from token claims
 		}
 	}

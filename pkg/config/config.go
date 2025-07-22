@@ -16,7 +16,7 @@ type Config struct {
 	Server   ServerConfig
 	Security SecurityConfig
 	Logging  LoggingConfig
-	
+
 	// Legacy fields for backward compatibility
 	BaseURL string
 	Port    string
@@ -28,7 +28,7 @@ type Config struct {
 	// Clients loaded from YAML
 	Clients []ClientConfig
 
-	// Users loaded from YAML  
+	// Users loaded from YAML
 	Users []UserConfig
 
 	// Reverse Proxy Configuration (can be overridden by YAML)
@@ -50,12 +50,12 @@ type ServerConfig struct {
 
 // SecurityConfig holds security-related configuration
 type SecurityConfig struct {
-	JWTSecret                  string `yaml:"jwt_signing_key"`
-	TokenExpirySeconds         int    `yaml:"token_expiry_seconds"`
-	RefreshTokenExpirySeconds  int    `yaml:"refresh_token_expiry_seconds"`
-	DeviceCodeExpirySeconds    int    `yaml:"device_code_expiry_seconds"`
-	EnablePKCE                 bool   `yaml:"enable_pkce"`
-	RequireHTTPS               bool   `yaml:"require_https"`
+	JWTSecret                 string `yaml:"jwt_signing_key"`
+	TokenExpirySeconds        int    `yaml:"token_expiry_seconds"`
+	RefreshTokenExpirySeconds int    `yaml:"refresh_token_expiry_seconds"`
+	DeviceCodeExpirySeconds   int    `yaml:"device_code_expiry_seconds"`
+	EnablePKCE                bool   `yaml:"enable_pkce"`
+	RequireHTTPS              bool   `yaml:"require_https"`
 }
 
 // LoggingConfig holds logging configuration
@@ -92,12 +92,12 @@ type UserConfig struct {
 
 // YAMLConfig represents the raw YAML configuration structure
 type YAMLConfig struct {
-	Server   ServerConfig    `yaml:"server"`
-	Security SecurityConfig  `yaml:"security"`
-	Logging  LoggingConfig   `yaml:"logging"`
-	Clients  []ClientConfig  `yaml:"clients"`
-	Users    []UserConfig    `yaml:"users"`
-	Proxy    *ProxyConfig    `yaml:"proxy,omitempty"`
+	Server   ServerConfig   `yaml:"server"`
+	Security SecurityConfig `yaml:"security"`
+	Logging  LoggingConfig  `yaml:"logging"`
+	Clients  []ClientConfig `yaml:"clients"`
+	Users    []UserConfig   `yaml:"users"`
+	Proxy    *ProxyConfig   `yaml:"proxy,omitempty"`
 }
 
 // ProxyConfig holds proxy-related configuration
@@ -233,39 +233,39 @@ func (c *Config) Validate() error {
 	if c.Security.JWTSecret == "" {
 		return fmt.Errorf("JWT secret is required")
 	}
-	
+
 	if c.Server.Port <= 0 || c.Server.Port > 65535 {
 		return fmt.Errorf("invalid server port: %d", c.Server.Port)
 	}
-	
+
 	if c.Server.Host == "" {
 		return fmt.Errorf("server host is required")
 	}
-	
+
 	// Validate clients
 	for i, client := range c.Clients {
 		if client.ID == "" {
 			return fmt.Errorf("client %d: client ID is required", i)
 		}
-		
+
 		// Public clients don't need secrets, but confidential clients do
 		if !client.Public && client.Secret == "" {
 			return fmt.Errorf("client %s: client secret is required for confidential clients", client.ID)
 		}
-		
+
 		// Validate grant types
 		for _, grantType := range client.GrantTypes {
 			if !isValidGrantType(grantType) {
 				return fmt.Errorf("client %s: invalid grant type: %s", client.ID, grantType)
 			}
 		}
-		
+
 		// Authorization code flow requires redirect URIs
 		if contains(client.GrantTypes, "authorization_code") && len(client.RedirectURIs) == 0 {
 			return fmt.Errorf("client %s: redirect URIs required for authorization_code grant", client.ID)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -325,21 +325,21 @@ func (c *Config) GetFirstUser() (*UserConfig, bool) {
 
 // LoadYAMLConfig loads YAML configuration from a file
 func LoadYAMLConfig(configPath string) (*YAMLConfig, error) {
-    if configPath == "" {
-        configPath = "config.yaml"
-    }
+	if configPath == "" {
+		configPath = "config.yaml"
+	}
 
-    data, err := ioutil.ReadFile(configPath)
-    if err != nil {
-        return nil, fmt.Errorf("failed to read YAML config file: %w", err)
-    }
+	data, err := ioutil.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read YAML config file: %w", err)
+	}
 
-    var yamlConfig YAMLConfig
-    if err := yaml.Unmarshal(data, &yamlConfig); err != nil {
-        return nil, fmt.Errorf("failed to parse YAML config: %w", err)
-    }
+	var yamlConfig YAMLConfig
+	if err := yaml.Unmarshal(data, &yamlConfig); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
+	}
 
-    return &yamlConfig, nil
+	return &yamlConfig, nil
 }
 
 // Helper functions
@@ -362,5 +362,3 @@ func isValidGrantType(grantType string) bool {
 	}
 	return contains(validGrantTypes, grantType)
 }
-
-

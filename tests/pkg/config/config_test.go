@@ -97,8 +97,8 @@ func TestConfig(t *testing.T) {
 		// Test that we can create config with environment-based values
 		cfg := &config.Config{
 			Server: config.ServerConfig{
-				Port: 3000, // Would be read from env in real implementation
-				Host: "0.0.0.0",
+				Port:    3000, // Would be read from env in real implementation
+				Host:    "0.0.0.0",
 				BaseURL: "http://0.0.0.0:3000",
 			},
 			Security: config.SecurityConfig{

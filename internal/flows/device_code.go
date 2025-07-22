@@ -121,12 +121,12 @@ func (f *DeviceCodeFlow) HandleAuthorization(w http.ResponseWriter, r *http.Requ
 	verificationURIComplete := fmt.Sprintf("%s/device?user_code=%s", baseURL, userCode)
 
 	response := map[string]interface{}{
-		"device_code":                deviceCode,
-		"user_code":                  userCode,
-		"verification_uri":           verificationURI,
-		"verification_uri_complete":  verificationURIComplete,
-		"expires_in":                 expiresAt,
-		"interval":                   5, // Polling interval in seconds
+		"device_code":               deviceCode,
+		"user_code":                 userCode,
+		"verification_uri":          verificationURI,
+		"verification_uri_complete": verificationURIComplete,
+		"expires_in":                expiresAt,
+		"interval":                  5, // Polling interval in seconds
 	}
 
 	log.Printf("✅ Device authorization created for client: %s, user code: %s", clientID, userCode)

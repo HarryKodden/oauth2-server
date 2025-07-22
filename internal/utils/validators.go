@@ -119,19 +119,18 @@ func ValidateScope(requestedScope, allowedScopes string) bool {
 
 // ValidateAccessToken validates an access token (simplified implementation)
 func ValidateAccessToken(token string) error {
-    if token == "" {
-        return errors.New("empty token")
-    }
-    
-    // For demo purposes, accept any non-empty token
-    // In a real implementation, you'd validate JWT signatures, expiration, etc.
-    if len(token) < 10 {
-        return errors.New("invalid token format")
-    }
-    
-    return nil
-}
+	if token == "" {
+		return errors.New("empty token")
+	}
 
+	// For demo purposes, accept any non-empty token
+	// In a real implementation, you'd validate JWT signatures, expiration, etc.
+	if len(token) < 10 {
+		return errors.New("invalid token format")
+	}
+
+	return nil
+}
 
 // ValidateUserCode checks if the user code format is valid
 func ValidateUserCode(userCode string) error {
@@ -141,7 +140,7 @@ func ValidateUserCode(userCode string) error {
 
 	// Remove hyphens and spaces for validation
 	cleanCode := strings.ReplaceAll(strings.ReplaceAll(userCode, "-", ""), " ", "")
-	
+
 	// User codes should be 6-8 characters, alphanumeric
 	re := regexp.MustCompile(`^[A-Z0-9]{6,8}$`)
 	if !re.MatchString(cleanCode) {

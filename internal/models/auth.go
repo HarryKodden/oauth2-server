@@ -19,15 +19,15 @@ type ClientCredentialsResponse struct {
 
 // ClientAuthRequest represents a client authentication request
 type ClientAuthRequest struct {
-    ClientID     string `json:"client_id"`
-    ClientSecret string `json:"client_secret"`
+	ClientID     string `json:"client_id"`
+	ClientSecret string `json:"client_secret"`
 }
 
 // ClientAuthResponse represents a client authentication response
 type ClientAuthResponse struct {
-    ClientID      string   `json:"client_id"`
-    Scopes        []string `json:"scopes,omitempty"`
-    GrantTypes    []string `json:"grant_types,omitempty"`
-    Audience      []string `json:"audience,omitempty"`
-    Authenticated bool     `json:"authenticated"`
+	ClientID      string   `json:"client_id"`
+	Scopes        []string `json:"scopes,omitempty"`
+	GrantTypes    []string `json:"grant_types,omitempty"`
+	Audience      []string `json:"audience,omitempty"`
+	Authenticated bool     `json:"authenticated"`
 }
