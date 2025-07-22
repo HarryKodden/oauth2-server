@@ -54,24 +54,6 @@ jobs:
           fi
           echo "✅ All files are properly formatted"
 
-#     - name: Run vet
-#       run: go vet ./...
-
-#     - name: Install staticcheck
-#       run: go install honnef.co/go/tools/cmd/staticcheck@latest
-
-#     - name: Run staticcheck
-#       run: staticcheck ./...
-      - name: Check test coverage
-        run: |
-          go tool cover -func=coverage.out
-          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
-          echo "Coverage: $COVERAGE%"
-          if (( $(echo "$COVERAGE < 30" | bc -l) )); then
-            echo "WARNING: Coverage is below 30%"
-            # exit 1
-          fi
-
   build:
     name: Build
     runs-on: ubuntu-latest
