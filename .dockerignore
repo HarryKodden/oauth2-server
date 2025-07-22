@@ -1,0 +1,17 @@
+.git
+.github
+.gitignore
+README.md
+Dockerfile
+.dockerignore
+bin/
+coverage.out
+*.log
+.env
+.env.local
+.vscode
+.idea
+*.md
+docs/
+examples/flows/*.go
+!examples/examples.go

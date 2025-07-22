@@ -1,4 +1,4 @@
-.PHONY: build run test clean docker-build docker-run test-flow test-integration benchmark coverage-html security tidy check
+.PHONY: build run test clean docker-build docker-run test-flow test-integration benchmark coverage-html security tidy check examples run-examples clean-examples examples-auth-code examples-client-creds examples-device examples-token-exchange examples-all run-examples-auth run-examples-client run-examples-device run-examples-token
 
 # Build the application
 build:
