@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.23-alpine AS builder  # Updated to Go 1.23
+FROM golang:1.23-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
@@ -7,11 +7,11 @@ RUN apk add --no-cache git ca-certificates tzdata
 # Set working directory
 WORKDIR /app
 
-# Copy go mod files
+# Copy go mod files first for better caching
 COPY go.mod go.sum ./
 
-# Download dependencies
-RUN go mod download
+# Download dependencies (cached if go.mod/go.sum haven't changed)
+RUN go mod download && go mod verify
 
 # Copy source code
 COPY . .
@@ -19,42 +19,40 @@ COPY . .
 # Build arguments
 ARG VERSION=dev
 ARG COMMIT_SHA=unknown
+ARG BUILD_TIME
+ARG GO_VERSION
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${COMMIT_SHA}" \
+# Build the application with optimizations
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -a -installsuffix cgo \
+    -ldflags="-s -w -extldflags '-static' \
+              -X main.version=${VERSION} \
+              -X main.commit=${COMMIT_SHA} \
+              -X main.buildTime=${BUILD_TIME} \
+              -X main.goVersion=${GO_VERSION}" \
     -o oauth2-server \
     cmd/server/main.go
 
-# Final stage
-FROM alpine:latest
+# Verify the binary
+RUN ldd oauth2-server 2>&1 | grep -q "not a dynamic executable" || (echo "Binary is not static" && exit 1)
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates tzdata
+# Final stage - use distroless for security
+FROM gcr.io/distroless/static:nonroot
 
-# Create non-root user
-RUN addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+# Copy binary from builder stage
+COPY --from=builder /app/oauth2-server /app/oauth2-server
+
+# Copy configuration files
+COPY --from=builder /app/config.yaml /app/config.yaml
 
 # Set working directory
 WORKDIR /app
 
-# Copy binary from builder stage
-COPY --from=builder /app/oauth2-server .
-COPY --from=builder /app/config.yaml .
-
-# Change ownership
-RUN chown -R appuser:appgroup /app
-
-# Switch to non-root user
-USER appuser
+# Use non-root user (already set in distroless/static:nonroot)
+USER nonroot:nonroot
 
 # Expose port
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
-
 # Run the application
-CMD ["./oauth2-server"]
+ENTRYPOINT ["./oauth2-server"]
