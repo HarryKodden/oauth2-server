@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "oauth2-server.fullname" . }}
+  labels:
+    {{- include "oauth2-server.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "oauth2-server.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "oauth2-server.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "oauth2-server.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "oauth2-server.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          {{- if .Values.healthCheck.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.healthCheck.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.healthCheck.readinessProbe | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: PORT
+              value: {{ .Values.config.server.port | quote }}
+            {{- if .Values.config.server.host }}
+            - name: HOST
+              value: {{ .Values.config.server.host | quote }}
+            {{- end }}
+            {{- if .Values.config.server.baseUrl }}
+            - name: PUBLIC_BASE_URL
+              value: {{ .Values.config.server.baseUrl | quote }}
+            {{- end }}
+            {{- if .Values.config.proxy.trustHeaders }}
+            - name: TRUST_PROXY_HEADERS
+              value: {{ .Values.config.proxy.trustHeaders | quote }}
+            {{- end }}
+            {{- if .Values.config.proxy.forceHTTPS }}
+            - name: FORCE_HTTPS
+              value: {{ .Values.config.proxy.forceHTTPS | quote }}
+            {{- end }}
+            {{- if .Values.config.proxy.trustedProxies }}
+            - name: TRUSTED_PROXIES
+              value: {{ .Values.config.proxy.trustedProxies | quote }}
+            {{- end }}
+            {{- if .Values.config.jwt.secret }}
+            - name: JWT_SIGNING_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "oauth2-server.fullname" . }}-secret
+                  key: jwt-secret
+            {{- end }}
+            {{- if .Values.config.security.tokenExpirySeconds }}
+            - name: TOKEN_EXPIRY_SECONDS
+              value: {{ .Values.config.security.tokenExpirySeconds | quote }}
+            {{- end }}
+            {{- if .Values.config.security.refreshTokenExpirySeconds }}
+            - name: REFRESH_TOKEN_EXPIRY_SECONDS
+              value: {{ .Values.config.security.refreshTokenExpirySeconds | quote }}
+            {{- end }}
+            {{- if .Values.config.security.requireHTTPS }}
+            - name: REQUIRE_HTTPS
+              value: {{ .Values.config.security.requireHTTPS | quote }}
+            {{- end }}
+            {{- if .Values.config.security.enablePKCE }}
+            - name: ENABLE_PKCE
+              value: {{ .Values.config.security.enablePKCE | quote }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "oauth2-server.fullname" . }}-pvc
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

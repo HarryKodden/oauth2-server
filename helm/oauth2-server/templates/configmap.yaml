@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "oauth2-server.fullname" . }}-config
+  labels:
+    {{- include "oauth2-server.labels" . | nindent 4 }}
+data:
+  server-port: {{ .Values.config.server.port | quote }}
+  access-token-lifespan: {{ .Values.config.security.tokenExpirySeconds | quote }}
+  refresh-token-lifespan: {{ .Values.config.security.refreshTokenExpirySeconds | quote }}
+  auth-code-lifespan: {{ .Values.config.security.authCodeLifespan | quote }}
+  {{- if .Values.config.server.baseUrl }}
+  server-base-url: {{ .Values.config.server.baseUrl | quote }}
+  {{- end }}

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: oauth2-server
+description: A Helm chart for OAuth2 Server
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+- oauth2
+- authentication
+- authorization
+home: https://github.com/harrykodden/oauth2-server
+sources:
+- https://github.com/harrykodden/oauth2-server
+maintainers:
+- name: Harry Kodden
+  email: harry@example.com

@@ -1,0 +1,164 @@
+# Default values for oauth2-server.
+# This is a YAML-formatted file.
+
+replicaCount: 1
+
+image:
+  repository: harrykodden/oauth2-server
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false # Changed from true to false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: "" # Will use "default" service account
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 65534
+  runAsNonRoot: true
+  runAsUser: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65534
+  seccompProfile:
+    type: RuntimeDefault
+
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+  - host: oauth2-server.local
+    paths:
+    - path: /
+      pathType: Prefix
+  tls: []
+  #  - secretName: oauth2-server-tls
+  #    hosts:
+  #      - oauth2-server.local
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# OAuth2 Server Configuration
+config:
+  server:
+    port: "8080"
+    host: "" # Optional host binding
+    baseUrl: "" # Will be auto-detected if empty
+  proxy:
+    trustHeaders: true
+    forceHTTPS: false
+    trustedProxies: "" # Comma-separated list of trusted proxy IPs
+  jwt:
+    secret: "" # Should be set via secret
+  security:
+    tokenExpirySeconds: 3600 # 1 hour
+    refreshTokenExpirySeconds: 86400 # 24 hours
+    requireHTTPS: false
+    enablePKCE: true
+
+# Environment variables
+env: []
+  # - name: OAUTH_SERVER_PORT
+  #   value: "8080"
+
+# Environment variables from secrets/configmaps
+envFrom: []
+  # - secretRef:
+  #     name: oauth2-server-secrets
+  # - configMapRef:
+  #     name: oauth2-server-config
+
+# Persistent Volume for data storage
+persistence:
+  enabled: false
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  annotations: {}
+
+# Health checks
+healthCheck:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+  # Network Policy
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# Service Monitor for Prometheus
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  labels: {}
+  annotations: {}
