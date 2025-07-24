@@ -70,7 +70,7 @@ func main() {
 
 	// Load configuration from YAML
 	var err error
-	cfg, err = config.NewConfig() // Use = instead of := to set the global variable
+	cfg, err = config.Load()
 	if err != nil {
 		log.Fatalf("❌ Failed to load configuration: %v", err)
 	}

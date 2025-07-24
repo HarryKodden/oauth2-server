@@ -2,45 +2,42 @@ package config
 
 import (
 	"fmt"
-	"log"
+	"oauth2-server/internal/utils"
 	"os"
 	"strconv"
 
 	"gopkg.in/yaml.v3"
-
-	"oauth2-server/internal/utils"
 )
+
+func (c *Config) NormalizeAllClientRedirectURIs() {
+	for i := range c.Clients {
+		for j, uri := range c.Clients[i].RedirectURIs {
+			c.Clients[i].RedirectURIs[j] = utils.NormalizeRedirectURI(c.Server.BaseURL, uri)
+		}
+	}
+}
 
 // LoadConfig loads configuration from environment variables and config file
 func Load() (*Config, error) {
 	cfg := &Config{}
 
-	// Set defaults
-	cfg.Server.Port = getEnvAsInt("SERVER_PORT", 8080)
-	cfg.Server.Host = getEnv("SERVER_HOST", "localhost")
-	cfg.Server.BaseURL = getEnv("SERVER_BASE_URL", fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port))
-	cfg.Server.ReadTimeout = getEnvAsInt("SERVER_READ_TIMEOUT", 30)
-	cfg.Server.WriteTimeout = getEnvAsInt("SERVER_WRITE_TIMEOUT", 30)
-	cfg.Server.ShutdownTimeout = getEnvAsInt("SERVER_SHUTDOWN_TIMEOUT", 5)
-
-	cfg.Security.JWTSecret = getEnv("JWT_SECRET", "your-secret-key-here")
-	cfg.Security.TokenExpirySeconds = getEnvAsInt("TOKEN_EXPIRY_SECONDS", 3600)
-	cfg.Security.RefreshTokenExpirySeconds = getEnvAsInt("REFRESH_TOKEN_EXPIRY_SECONDS", 86400)
-	cfg.Security.DeviceCodeExpirySeconds = getEnvAsInt("DEVICE_CODE_EXPIRY_SECONDS", 600)
-	cfg.Security.EnablePKCE = getEnvAsBool("ENABLE_PKCE", true)
-	cfg.Security.RequireHTTPS = getEnvAsBool("REQUIRE_HTTPS", false)
-
-	cfg.Logging.Level = getEnv("LOG_LEVEL", "info")
-	cfg.Logging.Format = getEnv("LOG_FORMAT", "text")
-	cfg.Logging.EnableAudit = getEnvAsBool("ENABLE_AUDIT", true)
-
-	// Try to load from config file
+	// 1. Load YAML config
 	configPath := getEnv("CONFIG_FILE", "config.yaml")
 	if _, err := os.Stat(configPath); err == nil {
 		if err := LoadFromFile(configPath, cfg); err != nil {
 			return nil, fmt.Errorf("failed to load config file: %w", err)
 		}
 	}
+
+	// 2. Apply environment variable overrides
+	cfg.LoadFromEnv()
+
+	// 3. Normalize redirect URIs with the final base URL
+	cfg.NormalizeAllClientRedirectURIs()
+
+	cfg.BaseURL = cfg.Server.BaseURL
+	cfg.Port = fmt.Sprintf("%d", cfg.Server.Port)
+	cfg.Host = cfg.Server.Host
 
 	return cfg, nil
 }
@@ -54,18 +51,6 @@ func LoadFromFile(path string, cfg *Config) error {
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return fmt.Errorf("failed to parse config file: %w", err)
-	}
-
-	// Normalize redirect URIs for all clients
-	for i := range cfg.Clients {
-		var normalized []string
-
-		log.Printf("LOADING  %s", cfg.Clients[i].ID)
-
-		for _, uri := range cfg.Clients[i].RedirectURIs {
-			normalized = append(normalized, utils.NormalizeRedirectURI(cfg.Server.BaseURL, uri))
-		}
-		cfg.Clients[i].RedirectURIs = normalized
 	}
 
 	return nil
