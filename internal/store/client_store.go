@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"net/http"
 	"sync"
 	"time"
 
@@ -90,15 +89,9 @@ func (c *Client) GetAudience() fosite.Arguments {
 	return fosite.Arguments(c.Audience)
 }
 
-// GetResolvedRedirectURIs returns the redirect URIs resolved to absolute URIs
-// based on the current request context (proxy-aware)
-func (c *Client) GetResolvedRedirectURIs(r *http.Request, configBaseURL string) []string {
-	return utils.ResolveRedirectURIs(c.RedirectURIs, r, configBaseURL)
-}
-
 // ValidateRedirectURI validates a redirect URI against this client's registered URIs
-func (c *Client) ValidateRedirectURI(requestedURI string, r *http.Request, configBaseURL string) bool {
-	return utils.ValidateClientRedirectURI(requestedURI, c.RedirectURIs, r, configBaseURL)
+func (c *Client) ValidateRedirectURI(requestedURI string) bool {
+	return utils.ValidateClientRedirectURI(requestedURI, c.RedirectURIs)
 }
 
 // CreateDefaultClient creates a default client from ClientInfo
@@ -254,7 +247,7 @@ func (cs *ClientStore) LoadClientsFromConfig(clients []config.ClientConfig) erro
 		}
 
 		cs.clients[clientConfig.ID] = client
-		log.Printf("✅ Loaded client from config: %s (%s)", client.ID, client.Name)
+		log.Printf("✅ Loaded client from config: %s (%s) Redirect URIs: %v", client.ID, client.Name, client.RedirectURIs)
 	}
 
 	log.Printf("📦 Loaded %d clients from configuration", len(clients))

@@ -2,10 +2,13 @@ package config
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 
 	"gopkg.in/yaml.v3"
+
+	"oauth2-server/internal/utils"
 )
 
 // LoadConfig loads configuration from environment variables and config file
@@ -51,6 +54,18 @@ func LoadFromFile(path string, cfg *Config) error {
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	// Normalize redirect URIs for all clients
+	for i := range cfg.Clients {
+		var normalized []string
+
+		log.Printf("LOADING  %s", cfg.Clients[i].ID)
+
+		for _, uri := range cfg.Clients[i].RedirectURIs {
+			normalized = append(normalized, utils.NormalizeRedirectURI(cfg.Server.BaseURL, uri))
+		}
+		cfg.Clients[i].RedirectURIs = normalized
 	}
 
 	return nil

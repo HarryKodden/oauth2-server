@@ -121,15 +121,9 @@ func (c ClientConfig) ToModelsClientInfo() models.ClientInfo {
 	}
 }
 
-// GetResolvedRedirectURIs returns the redirect URIs resolved to absolute URIs
-// based on the current request context (proxy-aware)
-func (c ClientConfig) GetResolvedRedirectURIs(r *http.Request, configBaseURL string) []string {
-	return utils.ResolveRedirectURIs(c.RedirectURIs, r, configBaseURL)
-}
-
 // ValidateRedirectURI validates a redirect URI against this client's registered URIs
-func (c ClientConfig) ValidateRedirectURI(requestedURI string, r *http.Request, configBaseURL string) bool {
-	return utils.ValidateClientRedirectURI(requestedURI, c.RedirectURIs, r, configBaseURL)
+func (c ClientConfig) ValidateRedirectURI(requestedURI string) bool {
+	return utils.ValidateClientRedirectURI(requestedURI, c.ToModelsClientInfo().RedirectURIs)
 }
 
 // ToModelsUser converts UserConfig to models.User
@@ -211,6 +205,13 @@ func NewConfig(configPath ...string) (*Config, error) {
 			TokenEndpointAuthMethod: clientConfig.TokenEndpointAuthMethod,
 			Public:                  clientConfig.Public,
 			EnabledFlows:            clientConfig.EnabledFlows,
+		}
+	}
+
+	for _, client := range config.Clients {
+		// Normalize redirect URIs for each client
+		for i, uri := range client.RedirectURIs {
+			client.RedirectURIs[i] = utils.NormalizeRedirectURI(config.Server.BaseURL, uri)
 		}
 	}
 

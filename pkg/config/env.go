@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"oauth2-server/internal/models"
+	"oauth2-server/internal/utils"
 )
 
 // LoadFromEnv loads configuration from environment variables and overrides YAML config
@@ -160,7 +161,11 @@ func (c *Config) loadClientsFromEnv() {
 				Audience:      strings.Split(getOrDefault(props, "AUDIENCE", ""), ","),
 			}
 
-			// Filter out empty strings
+			for i, uri := range clientInfo.RedirectURIs {
+				clientInfo.RedirectURIs[i] = utils.NormalizeRedirectURI(c.BaseURL, uri)
+
+			}
+
 			clientInfo.RedirectURIs = filterEmpty(clientInfo.RedirectURIs)
 			clientInfo.GrantTypes = filterEmpty(clientInfo.GrantTypes)
 			clientInfo.ResponseTypes = filterEmpty(clientInfo.ResponseTypes)
