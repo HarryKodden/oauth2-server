@@ -499,6 +499,11 @@ func (c *Config) SetDefaults() {
 		c.Security.EnableTrustAnchorAPI = false
 	}
 
+	// Ensure attestation block exists so handlers can safely check fields
+	if c.Attestation == nil {
+		c.Attestation = &AttestationConfig{}
+	}
+
 	// Set default CIMD configuration
 	if c.CIMD == nil {
 		c.CIMD = &CIMDConfig{}

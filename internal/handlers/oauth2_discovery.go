@@ -181,8 +181,10 @@ func (h *OAuth2DiscoveryHandler) getTokenEndpointAuthMethods() []string {
 		"none",
 	}
 
-	// Add attestation methods if attestation is enabled
-	if h.Configuration.Attestation.Enabled && h.AttestationManager != nil {
+	// Add attestation methods if attestation is enabled.  Be defensive in
+	// case the configuration is missing or the attestation block is nil.
+	if h.Configuration != nil && h.Configuration.Attestation != nil &&
+		h.Configuration.Attestation.Enabled && h.AttestationManager != nil {
 		attestationMethods := h.getAttestationMethods()
 		methods = append(methods, attestationMethods...)
 	}
