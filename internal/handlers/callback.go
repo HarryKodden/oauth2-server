@@ -18,17 +18,19 @@ type CallbackHandler struct {
 	Log                *logrus.Logger
 	UpstreamSessionMap *map[string]UpstreamSessionData
 	AuthCodeToStateMap *map[string]string
+	AuthCodeToNonceMap *map[string]string // maps code->original nonce
 	ClaimsHandler      *ClaimsHandler
 	Storage            store.Storage
 }
 
 // NewCallbackHandler creates a new callback handler
-func NewCallbackHandler(configuration *config.Config, log *logrus.Logger, upstreamSessionMap *map[string]UpstreamSessionData, authCodeToStateMap *map[string]string, claimsHandler *ClaimsHandler, storage store.Storage) *CallbackHandler {
+func NewCallbackHandler(configuration *config.Config, log *logrus.Logger, upstreamSessionMap *map[string]UpstreamSessionData, authCodeToStateMap *map[string]string, authCodeToNonceMap *map[string]string, claimsHandler *ClaimsHandler, storage store.Storage) *CallbackHandler {
 	return &CallbackHandler{
 		Configuration:      configuration,
 		Log:                log,
 		UpstreamSessionMap: upstreamSessionMap,
 		AuthCodeToStateMap: authCodeToStateMap,
+		AuthCodeToNonceMap: authCodeToNonceMap,
 		ClaimsHandler:      claimsHandler,
 		Storage:            storage,
 	}
@@ -77,10 +79,18 @@ func (h *CallbackHandler) handleProxyCallback(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Store the mapping from authorization code to original state for later retrieval during token exchange
+	// Store the mapping from authorization code to original state (and nonce)
+	// for later retrieval during token exchange
 	if code != "" && sess.OriginalIssuerState != "" {
 		(*h.AuthCodeToStateMap)[code] = sess.OriginalIssuerState
 		h.Log.Printf("🔄 [PROXY] Stored authorization code -> original issuer state mapping: %s -> %s", code[:20]+"...", sess.OriginalIssuerState)
+	}
+	if code != "" && sess.OriginalNonce != "" {
+		if h.AuthCodeToNonceMap == nil {
+			h.AuthCodeToNonceMap = &map[string]string{}
+		}
+		(*h.AuthCodeToNonceMap)[code] = sess.OriginalNonce
+		h.Log.Printf("🔄 [PROXY] Stored authorization code -> original nonce mapping: %s -> %s", code[:20]+"...", sess.OriginalNonce)
 	}
 
 	// Check if client requires forced consent

@@ -31,6 +31,7 @@ type TokenHandler struct {
 	Storage                     store.Storage
 	SecretManager               *store.SecretManager
 	AuthCodeToStateMap          *map[string]string
+	AuthCodeToNonceMap          *map[string]string // authorization_code -> original_nonce
 	DeviceCodeToUpstreamMap     *map[string]DeviceCodeMapping
 	AccessTokenToIssuerStateMap *map[string]string
 	AccessTokenStrategy         interface{} // Will be oauth2.AccessTokenStrategy
@@ -49,6 +50,7 @@ func NewTokenHandler(
 	storage store.Storage,
 	secretManager *store.SecretManager,
 	authCodeToStateMap *map[string]string,
+	authCodeToNonceMap *map[string]string,
 	deviceCodeToUpstreamMap *map[string]DeviceCodeMapping,
 	accessTokenToIssuerStateMap *map[string]string,
 	accessTokenStrategy interface{},
@@ -64,6 +66,7 @@ func NewTokenHandler(
 		Storage:                     storage,
 		SecretManager:               secretManager,
 		AuthCodeToStateMap:          authCodeToStateMap,
+		AuthCodeToNonceMap:          authCodeToNonceMap,
 		DeviceCodeToUpstreamMap:     deviceCodeToUpstreamMap,
 		AccessTokenToIssuerStateMap: accessTokenToIssuerStateMap,
 		AccessTokenStrategy:         accessTokenStrategy,

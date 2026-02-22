@@ -197,6 +197,17 @@ func (h *TokenHandler) handleProxyAuthorizationCode(w http.ResponseWriter, r *ht
 	if proxySession.Claims.Extra == nil {
 		proxySession.Claims.Extra = make(map[string]interface{})
 	}
+	// if we have a mapping from the auth code to the original nonce, preserve it
+	if h.AuthCodeToNonceMap != nil {
+		if code := r.FormValue("code"); code != "" {
+			if origNonce, ok := (*h.AuthCodeToNonceMap)[code]; ok && origNonce != "" {
+				proxySession.Claims.Extra["nonce"] = origNonce
+				h.Log.Printf("🔄 [PROXY-AUTH-CODE] Propagating original nonce for code %s", code[:10]+"...")
+				// once consumed we can remove it
+				delete(*h.AuthCodeToNonceMap, code)
+			}
+		}
+	}
 	proxySession.Claims.Extra["upstream_tokens"] = upstreamTokens
 	proxySession.Subject = clientID
 	proxySession.Username = clientID
