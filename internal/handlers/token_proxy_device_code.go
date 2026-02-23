@@ -275,7 +275,7 @@ func (h *TokenHandler) createProxyTokensForDeviceCode(w http.ResponseWriter, r *
 	// Prepare ID token if available
 	var idToken string
 	if upstreamIDToken != "" {
-		rewritten, err := h.rewriteUpstreamIDToken(ctx, upstreamIDToken, accessRequest, accessToken, "")
+		rewritten, err := h.rewriteUpstreamIDToken(ctx, upstreamIDToken, accessRequest, accessToken, "", "")
 		if err != nil {
 			h.Log.Errorf("❌ [PROXY-DEVICE] Failed to rewrite upstream id_token: %v", err)
 			http.Error(w, "failed to rewrite upstream id_token", http.StatusBadGateway)

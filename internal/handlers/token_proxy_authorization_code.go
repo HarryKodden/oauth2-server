@@ -198,13 +198,13 @@ func (h *TokenHandler) handleProxyAuthorizationCode(w http.ResponseWriter, r *ht
 		proxySession.Claims.Extra = make(map[string]interface{})
 	}
 	// if we have a mapping from the auth code to the original nonce, preserve it
+	var origNonceForRewrite string
 	if h.AuthCodeToNonceMap != nil {
 		if code := r.FormValue("code"); code != "" {
 			if origNonce, ok := (*h.AuthCodeToNonceMap)[code]; ok && origNonce != "" {
 				proxySession.Claims.Extra["nonce"] = origNonce
+				origNonceForRewrite = origNonce
 				h.Log.Printf("🔄 [PROXY-AUTH-CODE] Propagating original nonce for code %s", code[:10]+"...")
-				// once consumed we can remove it
-				delete(*h.AuthCodeToNonceMap, code)
 			}
 		}
 	}
@@ -312,7 +312,7 @@ func (h *TokenHandler) handleProxyAuthorizationCode(w http.ResponseWriter, r *ht
 	// Extract ID token if available
 	var idToken string
 	if upstreamIDToken != "" {
-		rewritten, err := h.rewriteUpstreamIDToken(ctx, upstreamIDToken, accessRequest, accessToken, r.FormValue("code"))
+		rewritten, err := h.rewriteUpstreamIDToken(ctx, upstreamIDToken, accessRequest, accessToken, r.FormValue("code"), origNonceForRewrite)
 		if err != nil {
 			h.Log.Errorf("❌ [PROXY-AUTH-CODE] Failed to rewrite upstream id_token: %v", err)
 			http.Error(w, "failed to rewrite upstream id_token", http.StatusBadGateway)
@@ -438,10 +438,17 @@ func (h *TokenHandler) handleProxyAuthorizationCode(w http.ResponseWriter, r *ht
 		h.Log.Errorf("❌ [PROXY-AUTH-CODE] Failed to encode proxy response: %v", err)
 	}
 
+	// cleanup: remove consumed auth-code -> nonce mapping if present
+	if h.AuthCodeToNonceMap != nil {
+		if code := r.FormValue("code"); code != "" {
+			delete(*h.AuthCodeToNonceMap, code)
+		}
+	}
+
 	h.Log.Infof("✅ [PROXY-AUTH-CODE] Successfully created proxy tokens for client %s", clientID)
 }
 
-func (h *TokenHandler) rewriteUpstreamIDToken(ctx context.Context, upstreamIDToken string, accessRequest fosite.AccessRequester, proxyAccessToken string, authCode string) (string, error) {
+func (h *TokenHandler) rewriteUpstreamIDToken(ctx context.Context, upstreamIDToken string, accessRequest fosite.AccessRequester, proxyAccessToken string, authCode string, origNonce string) (string, error) {
 	if upstreamIDToken == "" {
 		return "", nil
 	}
@@ -506,12 +513,23 @@ func (h *TokenHandler) rewriteUpstreamIDToken(ctx context.Context, upstreamIDTok
 		}
 	}
 
+	// Debug: log incoming nonce sources
+	h.Log.Debugf("🔍 [REWRITE-ID-TOKEN] origNonce param: '%s'", origNonce)
+	sessionNonce := ""
 	if sess, ok := accessRequest.GetSession().(*openid.DefaultSession); ok {
 		if sess != nil && sess.Claims != nil && sess.Claims.Extra != nil {
 			if nonce, ok := sess.Claims.Extra["nonce"].(string); ok && nonce != "" {
-				claims["nonce"] = nonce
+				sessionNonce = nonce
 			}
 		}
+	}
+	h.Log.Debugf("🔍 [REWRITE-ID-TOKEN] session nonce: '%s'", sessionNonce)
+
+	// Prefer explicit original nonce if provided, otherwise fall back to session
+	if origNonce != "" {
+		claims["nonce"] = origNonce
+	} else if sessionNonce != "" {
+		claims["nonce"] = sessionNonce
 	}
 
 	if proxyAccessToken != "" {
@@ -531,6 +549,7 @@ func (h *TokenHandler) rewriteUpstreamIDToken(ctx context.Context, upstreamIDTok
 		return "", fmt.Errorf("failed to get private key for id_token: %w", err)
 	}
 
+	h.Log.Debugf("🔍 [REWRITE-ID-TOKEN] final nonce claim before signing: '%v'", claims["nonce"])
 	token := gjwt.NewWithClaims(gjwt.SigningMethodRS256, claims)
 	if kid, err := utils.ComputeKIDFromKey(priv); err == nil && kid != "" {
 		token.Header["kid"] = kid
@@ -539,6 +558,15 @@ func (h *TokenHandler) rewriteUpstreamIDToken(ctx context.Context, upstreamIDTok
 	signed, err := token.SignedString(priv)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign rewritten id_token: %w", err)
+	}
+
+	// Verify signed token contains expected nonce (debug)
+	parsedClaims := gjwt.MapClaims{}
+	p := gjwt.NewParser()
+	if _, _, err := p.ParseUnverified(signed, parsedClaims); err == nil {
+		h.Log.Debugf("🔍 [REWRITE-ID-TOKEN] nonce in signed token: '%v'", parsedClaims["nonce"])
+	} else {
+		h.Log.Debugf("🔍 [REWRITE-ID-TOKEN] failed to parse signed token for debug: %v", err)
 	}
 
 	return signed, nil

@@ -454,7 +454,7 @@ func (h *TokenHandler) createProxyTokensForTokenExchange(w http.ResponseWriter, 
 	// Prepare ID token if available
 	var idToken string
 	if upstreamIDToken != "" {
-		rewritten, err := h.rewriteUpstreamIDToken(ctx, upstreamIDToken, accessRequest, accessToken, "")
+		rewritten, err := h.rewriteUpstreamIDToken(ctx, upstreamIDToken, accessRequest, accessToken, "", "")
 		if err != nil {
 			h.Log.Errorf("❌ [PROXY-TOKEN-EXCHANGE] Failed to rewrite upstream id_token: %v", err)
 			http.Error(w, "failed to rewrite upstream id_token", http.StatusBadGateway)

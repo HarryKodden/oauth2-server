@@ -246,12 +246,14 @@ if echo "$USERINFO_RESPONSE" | grep -q "sub"; then
     EMAIL=$(echo "$USERINFO_RESPONSE" | jq -r '.email' 2>/dev/null)
     NAME=$(echo "$USERINFO_RESPONSE" | jq -r '.name' 2>/dev/null)
     EMAIL_VERIFIED=$(echo "$USERINFO_RESPONSE" | jq -r '.email_verified' 2>/dev/null)
+    # Note: nonce is an ID Token claim per OIDC; we'll verify it from the ID token below
 
     echo "   User Claims:"
     echo "     Subject (sub): $SUB"
     echo "     Email: $EMAIL"
     echo "     Name: $NAME"
     echo "     Email Verified: $EMAIL_VERIFIED"
+    echo "     Nonce: (verify in id_token)"
 
     # Verify expected user data
     if [ "$SUB" = "john.doe" ]; then
@@ -272,6 +274,55 @@ if echo "$USERINFO_RESPONSE" | grep -q "sub"; then
         echo "❌ Name claim mismatch (expected: John Doe, got: $NAME)"
     fi
 
+    # Verify nonce from ID token (the upstream nonce is propagated into the id_token)
+    if [ "$ID_TOKEN" != "null" ] && [ "$ID_TOKEN" != "" ]; then
+        echo "   ID token length: ${#ID_TOKEN}"
+        echo "   Raw ID token:"
+        echo "$ID_TOKEN"
+
+        # remove any stray newlines from ID token (sometimes inserted by JSON formatting)
+        CLEAN_ID_TOKEN=$(echo "$ID_TOKEN" | tr -d '\n' | tr -d '\r')
+
+        echo "   Decoded ID token payload:"
+
+        # Extract payload (2nd segment), convert base64url -> base64, pad, decode and pretty-print via jq
+        PAYLOAD_B64=$(printf '%s' "$CLEAN_ID_TOKEN" | awk -F'.' '{print $2}')
+        # convert base64url to base64
+        PAYLOAD_B64=$(printf '%s' "$PAYLOAD_B64" | tr '_-' '/+')
+        # add padding
+        while [ $(( ${#PAYLOAD_B64} % 4 )) -ne 0 ]; do PAYLOAD_B64="$PAYLOAD_B64="; done
+
+        PAYLOAD_JSON=""
+        # Try GNU base64, then BSD base64 (-D), then openssl as fallbacks for portability
+        if printf '%s' "$PAYLOAD_B64" | base64 --decode >/dev/null 2>&1; then
+            PAYLOAD_JSON=$(printf '%s' "$PAYLOAD_B64" | base64 --decode 2>/dev/null)
+        elif printf '%s' "$PAYLOAD_B64" | base64 -D >/dev/null 2>&1; then
+            PAYLOAD_JSON=$(printf '%s' "$PAYLOAD_B64" | base64 -D 2>/dev/null)
+        elif command -v openssl >/dev/null 2>&1; then
+            PAYLOAD_JSON=$(printf '%s' "$PAYLOAD_B64" | openssl base64 -d -A 2>/dev/null)
+        else
+            PAYLOAD_JSON=""
+        fi
+
+        if [ -n "$PAYLOAD_JSON" ]; then
+            echo "$PAYLOAD_JSON" | jq . 2>/dev/null || echo "  <invalid JSON>"
+        else
+            echo "  <decode error>"
+        fi
+
+        NONCE_IN_ID=$(printf '%s' "$PAYLOAD_JSON" | jq -r '.nonce // ""' 2>/dev/null || echo "")
+
+        echo "   Nonce in ID token: $NONCE_IN_ID"
+        if [ "$NONCE_IN_ID" = "$NONCE" ]; then
+            echo "✅ Nonce in ID token matches (nonce preserved through proxy)"
+        else
+            echo "❌ Nonce in ID token mismatch (expected: $NONCE, got: $NONCE_IN_ID)"
+            exit 1
+        fi
+    else
+        echo "❌ No id_token available to verify nonce"
+        exit 1
+    fi
 else
     echo "❌ UserInfo endpoint failed or returned no data"
     exit 1
