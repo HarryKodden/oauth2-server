@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/eduwallet/oauth2-server)](https://goreportcard.com/report/github.com/eduwallet/oauth2-server)
 [![Go Reference](https://pkg.go.dev/badge/github.com/eduwallet/oauth2-server.svg)](https://pkg.go.dev/github.com/eduwallet/oauth2-server)
 [![Go Version](https://img.shields.io/badge/go-1.23-blue.svg)](https://golang.org/dl/)
-[![Docker Image](https://github.com/eduwallet/oauth2-server/pkgs/container/oauth2-server)](https://github.com/eduwallet/oauth2-server/pkgs/container/oauth2-server)
+[![Docker image](https://img.shields.io/ghcr/v/eduwallet/oauth2-server?sort=semver)](https://github.com/eduwallet/oauth2-server/pkgs/container/oauth2-server)
 [![GitHub release](https://img.shields.io/github/release/eduwallet/oauth2-server.svg)](https://github.com/eduwallet/oauth2-server/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
