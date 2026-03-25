@@ -113,6 +113,13 @@ type Config struct {
 	// Upstream Provider (only used in "proxy" mode)
 	UpstreamProvider UpstreamProviderConfig
 
+	// UpstreamPromptPolicy controls how we set/forward the OIDC "prompt" parameter to the upstream provider.
+	UpstreamPromptPolicy UpstreamPromptPolicyConfig `yaml:"upstream_prompt_policy,omitempty"`
+
+	// UpstreamPromptPolicies are named rules evaluated in order (first match wins).
+	// Primarily configured via environment variables (see README/.env.example).
+	UpstreamPromptPolicies []UpstreamPromptPolicyRule `yaml:"upstream_prompt_policies,omitempty"`
+
 	// Attestation configuration
 	Attestation *AttestationConfig `yaml:"attestation,omitempty"`
 
@@ -124,6 +131,61 @@ type Config struct {
 	// PublicBaseURL     string
 	ForceHTTPS     bool
 	TrustedProxies string
+}
+
+// UpstreamPromptPolicyRule is a single named policy for deciding how to set or remove the upstream OIDC "prompt" parameter.
+type UpstreamPromptPolicyRule struct {
+	Name string `yaml:"name"`
+
+	// Enabled turns the policy on/off (default: true if listed in UPSTREAM_PROMPT_POLICIES).
+	Enabled bool `yaml:"enabled"`
+
+	// Mode controls how the policy interacts with an incoming prompt parameter.
+	// - "set_if_missing": only set/remove prompt when none is provided (default)
+	// - "override": always apply, replacing/removing any provided prompt
+	// - "append": only meaningful for action=set; adds token in addition to any provided prompt
+	Mode string `yaml:"mode"`
+
+	// Action controls what to do when the policy matches.
+	// - "set": set prompt to Prompt (subject to Mode)
+	// - "remove": remove prompt entirely (subject to Mode)
+	Action string `yaml:"action"`
+
+	// Prompt value used for Action="set" (e.g. "login" or "consent").
+	Prompt string `yaml:"prompt"`
+
+	// Matchers (AND logic across all configured matchers)
+	MatchScope                     string `yaml:"match_scope"`
+	MatchAuthorizationDetailsType  string `yaml:"match_authorization_details_type"`
+	MatchCredentialConfigurationID string `yaml:"match_credential_configuration_id"`
+}
+
+// UpstreamPromptPolicyConfig controls how the proxy sets prompt=login vs prompt=consent when redirecting
+// to the upstream provider.
+type UpstreamPromptPolicyConfig struct {
+	// Enabled turns the policy on/off.
+	Enabled bool `yaml:"enabled"`
+
+	// Mode controls how the policy interacts with an incoming prompt parameter.
+	// - "set_if_missing": only set prompt when none is provided (default)
+	// - "override": always replace any provided prompt with the policy decision
+	// - "append": always add the policy decision in addition to any provided prompt
+	Mode string `yaml:"mode"`
+
+	// DefaultPrompt is used for non-eduID flows (default: "consent").
+	DefaultPrompt string `yaml:"default_prompt"`
+
+	// CustomPrompt is used for the custom flow (default: "login").
+	CustomPrompt string `yaml:"custom_prompt"`
+
+	// CustomScope marks a flow as "custom" if present in the effective scope list (default: "CUSTOM").
+	CustomScope string `yaml:"custom_scope"`
+
+	// CustomAuthorizationDetailsType marks a flow as custom when authorization_details contains an item with this type (default: "openid_credential").
+	CustomAuthorizationDetailsType string `yaml:"custom_authorization_details_type"`
+
+	// CustomCredentialConfigurationID marks a flow as custom when authorization_details contains an item with this credential_configuration_id (default: "CUSTOM").
+	CustomCredentialConfigurationID string `yaml:"custom_credential_configuration_id"`
 }
 
 // CIMDConfig holds configuration options for Client-Initiated Metadata Discovery
@@ -516,6 +578,39 @@ func (c *Config) SetDefaults() {
 	}
 	if c.CIMD.FetchWindowSeconds == 0 {
 		c.CIMD.FetchWindowSeconds = 60 // default window in seconds
+	}
+
+	// Upstream prompt policy defaults (safe even when disabled)
+	if c.UpstreamPromptPolicy.Mode == "" {
+		c.UpstreamPromptPolicy.Mode = "set_if_missing"
+	}
+	if c.UpstreamPromptPolicy.DefaultPrompt == "" {
+		c.UpstreamPromptPolicy.DefaultPrompt = "consent"
+	}
+	if c.UpstreamPromptPolicy.CustomPrompt == "" {
+		c.UpstreamPromptPolicy.CustomPrompt = "login"
+	}
+	if c.UpstreamPromptPolicy.CustomScope == "" {
+		c.UpstreamPromptPolicy.CustomScope = "CUSTOM"
+	}
+	if c.UpstreamPromptPolicy.CustomAuthorizationDetailsType == "" {
+		c.UpstreamPromptPolicy.CustomAuthorizationDetailsType = "openid_credential"
+	}
+	if c.UpstreamPromptPolicy.CustomCredentialConfigurationID == "" {
+		c.UpstreamPromptPolicy.CustomCredentialConfigurationID = "CUSTOM"
+	}
+
+	// Named upstream prompt policies defaults
+	for i := range c.UpstreamPromptPolicies {
+		if strings.TrimSpace(c.UpstreamPromptPolicies[i].Name) == "" {
+			continue
+		}
+		if c.UpstreamPromptPolicies[i].Mode == "" {
+			c.UpstreamPromptPolicies[i].Mode = "set_if_missing"
+		}
+		if c.UpstreamPromptPolicies[i].Action == "" {
+			c.UpstreamPromptPolicies[i].Action = "set"
+		}
 	}
 }
 

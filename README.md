@@ -246,6 +246,7 @@ Testing test_proxy_full_authentication_flow.sh   ... ✅ PASSED
 Testing test_proxy_public_client_flow.sh         ... ✅ PASSED
 Testing test_proxy_pushed_authorize_request.sh   ... ✅ PASSED
 Testing test_proxy_token_exchange.sh             ... ✅ PASSED
+Testing test_proxy_upstream_prompt_policies.sh   ... ✅ PASSED
 Testing test_proxy_userinfo.sh                   ... ✅ PASSED
 Testing test_public_client_flow.sh               ... ✅ PASSED
 Testing test_pushed_authorize_request.sh         ... ✅ PASSED
@@ -258,7 +259,7 @@ Testing test_userinfo.sh                         ... ✅ PASSED
 Testing test_validation.sh                       ... ✅ PASSED
 
 ════════════════════════════════════════════════════════════════
-📊 Test Summary: 32 passed, 0 failed
+📊 Test Summary: 33 passed, 0 failed
 ════════════════════════════════════════════════════════════════
 ✅ All tests passed!
 ```
@@ -311,6 +312,107 @@ The OAuth2 server supports comprehensive configuration through environment varia
 | `UPSTREAM_CLIENT_ID` | string | - | Client ID for the upstream provider |
 | `UPSTREAM_CLIENT_SECRET` | string | - | Client secret for the upstream provider |
 | `UPSTREAM_CALLBACK_URL` | string | - | Callback URL for the upstream provider (should point to this server) |
+
+### Upstream Prompt Policy (Proxy Mode)
+
+When running in proxy mode, you can optionally control which OIDC `prompt` value is sent to the upstream provider based on request content. This is useful for business-specific logic (e.g. selecting `prompt=login` for an eduID issuance flow, and `prompt=consent` otherwise).
+
+**How the "custom" flow is detected**
+
+The request is considered a **custom flow** if either of the following matches:
+
+- **Scope match**: the (effective) `scope` contains `eduID`
+- **Authorization Details match**: `authorization_details` contains an item with:
+  - `type == "openid_credential"` **and**
+  - `credential_configuration_id == "eduID"`
+
+If the request is a custom flow, the server uses `UPSTREAM_PROMPT_CUSTOM` (e.g. `login`). Otherwise it uses `UPSTREAM_PROMPT_DEFAULT` (e.g. `consent`).
+
+**Configuration (eduID use case)**
+
+```bash
+# Enable policy
+UPSTREAM_PROMPT_POLICY_ENABLED=true
+
+# Only set prompt if the caller didn't provide one (recommended default)
+UPSTREAM_PROMPT_POLICY_MODE=set_if_missing
+
+# Non-custom flow prompt
+UPSTREAM_PROMPT_DEFAULT=consent
+
+# Custom flow prompt
+UPSTREAM_PROMPT_CUSTOM=login
+
+# eduID detection knobs (these are just "custom" matchers)
+UPSTREAM_PROMPT_CUSTOM_SCOPE=eduID
+UPSTREAM_PROMPT_CUSTOM_AUTHZ_DETAILS_TYPE=openid_credential
+UPSTREAM_PROMPT_CUSTOM_CREDENTIAL_CONFIGURATION_ID=eduID
+```
+
+**Policy modes**
+
+- **`set_if_missing`**: only sets `prompt` when none is provided
+- **`override`**: always replaces any provided `prompt` with the policy decision
+- **`append`**: always adds the policy decision alongside any provided `prompt`
+
+### Upstream Prompt Policies (Multiple Rules, Proxy Mode)
+
+If you have **multiple custom flows**, you can configure multiple named prompt policies and evaluate them in order. The server checks policies in the order listed in `UPSTREAM_PROMPT_POLICIES` and applies the **first policy that matches**.
+
+**Matching semantics (AND logic)**
+
+Each policy can define one or more matchers. Matching uses **AND** logic across all configured matchers:
+
+- If a matcher is configured (non-empty), it **must** match.
+- If a matcher is not configured (empty), it is ignored.
+
+Supported matchers:
+
+- `MATCH_SCOPE`: matches if scope contains that value
+- `MATCH_AUTHZ_DETAILS_TYPE` and/or `MATCH_CREDENTIAL_CONFIGURATION_ID`: matches if `authorization_details` contains an item satisfying the configured fields (both fields, if configured, must match the same item)
+
+**Example (eduID => prompt=login; ANOTHER => remove prompt)**
+
+```bash
+UPSTREAM_PROMPT_POLICIES=EDUID,ANOTHER
+
+# eduID policy
+UPSTREAM_PROMPT_POLICY_EDUID_MODE=set_if_missing
+UPSTREAM_PROMPT_POLICY_EDUID_ACTION=set
+UPSTREAM_PROMPT_POLICY_EDUID_PROMPT=login
+UPSTREAM_PROMPT_POLICY_EDUID_MATCH_SCOPE=eduID
+UPSTREAM_PROMPT_POLICY_EDUID_MATCH_AUTHZ_DETAILS_TYPE=openid_credential
+UPSTREAM_PROMPT_POLICY_EDUID_MATCH_CREDENTIAL_CONFIGURATION_ID=eduID
+
+# another policy: remove prompt entirely
+UPSTREAM_PROMPT_POLICY_ANOTHER_MODE=override
+UPSTREAM_PROMPT_POLICY_ANOTHER_ACTION=remove
+UPSTREAM_PROMPT_POLICY_ANOTHER_MATCH_SCOPE=anotherScope
+```
+
+**Important: expressing OR logic**
+
+Because each policy uses **AND** logic across the matchers you configure, an eduID rule like:
+
+- `scope` contains `eduID` **OR**
+- `authorization_details` contains `{type:"openid_credential", credential_configuration_id:"eduID"}`
+
+should be expressed as **two policies**, both setting the same prompt. Example:
+
+```bash
+UPSTREAM_PROMPT_POLICIES=EDUID_SCOPE,EDUID_AUTHZ_DETAILS
+
+# Matches if scope contains eduID
+UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_ACTION=set
+UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_PROMPT=login
+UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_MATCH_SCOPE=eduID
+
+# Matches if authorization_details contains the eduID credential configuration
+UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_ACTION=set
+UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_PROMPT=login
+UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_AUTHZ_DETAILS_TYPE=openid_credential
+UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_CREDENTIAL_CONFIGURATION_ID=eduID
+```
 
 ### Security Configuration
 

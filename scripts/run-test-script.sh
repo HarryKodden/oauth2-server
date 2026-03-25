@@ -67,13 +67,40 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
     
     # Start OAuth2 server in proxy mode
     log "🚀 Starting OAuth2 server in proxy mode..."
-    DATABASE_TYPE="$TEST_DATABASE_TYPE" \
-        UPSTREAM_PROVIDER_URL="http://localhost:9999" \
-        UPSTREAM_CLIENT_ID="upstream_client" \
-        UPSTREAM_CLIENT_SECRET="upstream_secret" \
-        ENABLE_TRUST_ANCHOR_API=true \
-        API_KEY="$API_KEY" \
-        ./bin/oauth2-server > server-test.log 2>&1 &
+    
+    # Some proxy tests need additional proxy-mode env configuration.
+    # Keep this logic scoped to test scripts to avoid changing default proxy behavior.
+    EXTRA_UPSTREAM_PROMPT_POLICY_ENV=""
+    if echo "$SCRIPT" | grep -q "upstream_prompt_policies"; then
+        EXTRA_UPSTREAM_PROMPT_POLICY_ENV="yes"
+        log "🔧 Enabling upstream prompt policies for this test..."
+    fi
+
+    if [ -n "$EXTRA_UPSTREAM_PROMPT_POLICY_ENV" ]; then
+        DATABASE_TYPE="$TEST_DATABASE_TYPE" \
+            UPSTREAM_PROVIDER_URL="http://localhost:9999" \
+            UPSTREAM_CLIENT_ID="upstream_client" \
+            UPSTREAM_CLIENT_SECRET="upstream_secret" \
+            ENABLE_TRUST_ANCHOR_API=true \
+            API_KEY="$API_KEY" \
+            UPSTREAM_PROMPT_POLICIES="EDUID_SCOPE,EDUID_AUTHZ_DETAILS" \
+            UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_ACTION="set" \
+            UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_PROMPT="login" \
+            UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_MATCH_SCOPE="eduID" \
+            UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_ACTION="set" \
+            UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_PROMPT="login" \
+            UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_AUTHZ_DETAILS_TYPE="openid_credential" \
+            UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_CREDENTIAL_CONFIGURATION_ID="eduID" \
+            ./bin/oauth2-server > server-test.log 2>&1 &
+    else
+        DATABASE_TYPE="$TEST_DATABASE_TYPE" \
+            UPSTREAM_PROVIDER_URL="http://localhost:9999" \
+            UPSTREAM_CLIENT_ID="upstream_client" \
+            UPSTREAM_CLIENT_SECRET="upstream_secret" \
+            ENABLE_TRUST_ANCHOR_API=true \
+            API_KEY="$API_KEY" \
+            ./bin/oauth2-server > server-test.log 2>&1 &
+    fi
     echo $! > server.pid
     
     log "⏳ Waiting for server to start..."

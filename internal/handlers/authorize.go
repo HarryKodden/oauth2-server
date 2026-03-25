@@ -634,8 +634,96 @@ func (h *AuthorizeHandler) handleProxyAuthorize(w http.ResponseWriter, r *http.R
 		vals.Set("scope", strings.Join(requestedScopes, " "))
 	}
 
+	// Forward authorization_details to upstream (if present) and use it for custom flow detection.
+	authorizationDetailsJSON, hasAuthorizationDetails := getAuthorizationDetailsJSON(q)
+	if hasAuthorizationDetails {
+		vals.Set("authorization_details", authorizationDetailsJSON)
+	}
+
 	existingPrompt := q.Get("prompt")
-	if (customClient != nil && (customClient.ForceAuthentication || customClient.ForceConsent)) || existingPrompt != "" {
+	suppressForcedPrompts := false
+	if h.Configuration != nil {
+		effectiveScopes := strings.Fields(vals.Get("scope"))
+
+		// Prefer named policies when configured (first match wins).
+		if len(h.Configuration.UpstreamPromptPolicies) > 0 {
+			for _, rule := range h.Configuration.UpstreamPromptPolicies {
+				if !rule.Enabled {
+					continue
+				}
+
+				if !policyRuleMatches(effectiveScopes, authorizationDetailsJSON, rule) {
+					continue
+				}
+
+				mode := strings.ToLower(strings.TrimSpace(rule.Mode))
+				action := strings.ToLower(strings.TrimSpace(rule.Action))
+
+				switch action {
+				case "remove":
+					switch mode {
+					case "override":
+						existingPrompt = ""
+						suppressForcedPrompts = true
+					default: // set_if_missing
+						if existingPrompt == "" {
+							existingPrompt = ""
+							suppressForcedPrompts = true
+						}
+					}
+				default: // "set"
+					policyPrompt := strings.TrimSpace(rule.Prompt)
+					if policyPrompt != "" {
+						switch mode {
+						case "override":
+							existingPrompt = policyPrompt
+						case "append":
+							if existingPrompt == "" {
+								existingPrompt = policyPrompt
+							} else {
+								existingPrompt = policyPrompt + " " + existingPrompt
+							}
+						default: // set_if_missing
+							if existingPrompt == "" && !(customClient != nil && (customClient.ForceAuthentication || customClient.ForceConsent)) {
+								existingPrompt = policyPrompt
+							}
+						}
+					}
+				}
+
+				h.Log.Printf("🔍 [PROXY-AUTH] Upstream prompt policy matched (name=%s, mode=%s, action=%s), resolved prompt seed: %q", rule.Name, rule.Mode, rule.Action, existingPrompt)
+				break
+			}
+		} else if h.Configuration.UpstreamPromptPolicy.Enabled {
+			// Backwards compatible single-policy behavior.
+			policy := h.Configuration.UpstreamPromptPolicy
+
+			isCustom := isCustomFlow(effectiveScopes, authorizationDetailsJSON, policy)
+			policyPrompt := policy.DefaultPrompt
+			if isCustom {
+				policyPrompt = policy.CustomPrompt
+			}
+
+			switch strings.ToLower(strings.TrimSpace(policy.Mode)) {
+			case "override":
+				existingPrompt = policyPrompt
+			case "append":
+				if existingPrompt == "" {
+					existingPrompt = policyPrompt
+				} else {
+					existingPrompt = policyPrompt + " " + existingPrompt
+				}
+			default: // "set_if_missing"
+				if existingPrompt == "" && !(customClient != nil && (customClient.ForceAuthentication || customClient.ForceConsent)) {
+					existingPrompt = policyPrompt
+				}
+			}
+
+			h.Log.Printf("🔍 [PROXY-AUTH] Upstream prompt policy enabled (mode=%s, isCustom=%t), resolved prompt seed: %q", policy.Mode, isCustom, existingPrompt)
+		}
+	}
+
+	if ((customClient != nil && (customClient.ForceAuthentication || customClient.ForceConsent)) && !suppressForcedPrompts) || existingPrompt != "" {
 		seen := make(map[string]struct{})
 		promptValues := make([]string, 0, 3)
 
@@ -651,7 +739,7 @@ func (h *AuthorizeHandler) handleProxyAuthorize(w http.ResponseWriter, r *http.R
 			promptValues = append(promptValues, value)
 		}
 
-		if customClient != nil {
+		if customClient != nil && !suppressForcedPrompts {
 			if customClient.ForceAuthentication {
 				appendPrompt("login")
 			}

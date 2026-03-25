@@ -75,6 +75,8 @@ func (c *Config) LoadFromEnv() {
 
 	// Upstream provider configuration (moved from config.yaml for security)
 	c.loadUpstreamProviderFromEnv()
+	c.loadUpstreamPromptPolicyFromEnv()
+	c.loadUpstreamPromptPoliciesFromEnv()
 
 	// CIMD (Client-Initiated Metadata Discovery) configuration
 	// Environment variables:
@@ -371,4 +373,123 @@ func (c *Config) loadUpstreamProviderFromEnv() {
 			CallbackURL:  GetEnvString("UPSTREAM_CALLBACK_URL", ""),
 		}
 	}
+}
+
+func (c *Config) loadUpstreamPromptPolicyFromEnv() {
+	// Prompt policy configuration for proxy->upstream redirects
+	//
+	// Environment variables:
+	// - UPSTREAM_PROMPT_POLICY_ENABLED (bool)
+	// - UPSTREAM_PROMPT_POLICY_MODE ("set_if_missing" | "override" | "append")
+	// - UPSTREAM_PROMPT_DEFAULT (e.g. "consent")
+	// - UPSTREAM_PROMPT_CUSTOM (e.g. "login")
+	// - UPSTREAM_PROMPT_CUSTOM_SCOPE (e.g. "eduID")
+	// - UPSTREAM_PROMPT_CUSTOM_AUTHZ_DETAILS_TYPE (e.g. "openid_credential")
+	// - UPSTREAM_PROMPT_CUSTOM_CREDENTIAL_CONFIGURATION_ID (e.g. "eduID")
+	//
+	// Backwards compatible env vars (deprecated):
+	// - UPSTREAM_PROMPT_EDUID, UPSTREAM_PROMPT_EDUID_SCOPE, UPSTREAM_PROMPT_EDUID_AUTHZ_DETAILS_TYPE, UPSTREAM_PROMPT_EDUID_CREDENTIAL_CONFIGURATION_ID
+	if v := os.Getenv("UPSTREAM_PROMPT_POLICY_ENABLED"); v != "" {
+		c.UpstreamPromptPolicy.Enabled = GetEnvBool("UPSTREAM_PROMPT_POLICY_ENABLED", false)
+	}
+
+	if v := os.Getenv("UPSTREAM_PROMPT_POLICY_MODE"); v != "" {
+		c.UpstreamPromptPolicy.Mode = v
+	}
+
+	if v := os.Getenv("UPSTREAM_PROMPT_DEFAULT"); v != "" {
+		c.UpstreamPromptPolicy.DefaultPrompt = v
+	}
+
+	if v := os.Getenv("UPSTREAM_PROMPT_CUSTOM"); v != "" {
+		c.UpstreamPromptPolicy.CustomPrompt = v
+	} else if v := os.Getenv("UPSTREAM_PROMPT_EDUID"); v != "" && c.UpstreamPromptPolicy.CustomPrompt == "" {
+		// Backwards compat
+		c.UpstreamPromptPolicy.CustomPrompt = v
+	}
+
+	if v := os.Getenv("UPSTREAM_PROMPT_CUSTOM_SCOPE"); v != "" {
+		c.UpstreamPromptPolicy.CustomScope = v
+	} else if v := os.Getenv("UPSTREAM_PROMPT_EDUID_SCOPE"); v != "" && c.UpstreamPromptPolicy.CustomScope == "" {
+		// Backwards compat
+		c.UpstreamPromptPolicy.CustomScope = v
+	}
+	if v := os.Getenv("UPSTREAM_PROMPT_CUSTOM_AUTHZ_DETAILS_TYPE"); v != "" {
+		c.UpstreamPromptPolicy.CustomAuthorizationDetailsType = v
+	} else if v := os.Getenv("UPSTREAM_PROMPT_EDUID_AUTHZ_DETAILS_TYPE"); v != "" && c.UpstreamPromptPolicy.CustomAuthorizationDetailsType == "" {
+		// Backwards compat
+		c.UpstreamPromptPolicy.CustomAuthorizationDetailsType = v
+	}
+	if v := os.Getenv("UPSTREAM_PROMPT_CUSTOM_CREDENTIAL_CONFIGURATION_ID"); v != "" {
+		c.UpstreamPromptPolicy.CustomCredentialConfigurationID = v
+	} else if v := os.Getenv("UPSTREAM_PROMPT_EDUID_CREDENTIAL_CONFIGURATION_ID"); v != "" && c.UpstreamPromptPolicy.CustomCredentialConfigurationID == "" {
+		// Backwards compat
+		c.UpstreamPromptPolicy.CustomCredentialConfigurationID = v
+	}
+}
+
+func (c *Config) loadUpstreamPromptPoliciesFromEnv() {
+	// Named prompt policies evaluated in order (first match wins).
+	//
+	// Example:
+	//   UPSTREAM_PROMPT_POLICIES=EDUID,ANOTHER
+	//   UPSTREAM_PROMPT_POLICY_EDUID_MODE=set_if_missing
+	//   UPSTREAM_PROMPT_POLICY_EDUID_ACTION=set
+	//   UPSTREAM_PROMPT_POLICY_EDUID_PROMPT=login
+	//   UPSTREAM_PROMPT_POLICY_EDUID_MATCH_SCOPE=eduID
+	//
+	//   UPSTREAM_PROMPT_POLICY_ANOTHER_ACTION=remove
+	//   UPSTREAM_PROMPT_POLICY_ANOTHER_MODE=override
+	//   UPSTREAM_PROMPT_POLICY_ANOTHER_MATCH_SCOPE=someScope
+	namesRaw := strings.TrimSpace(os.Getenv("UPSTREAM_PROMPT_POLICIES"))
+	if namesRaw == "" {
+		return
+	}
+
+	names := filterEmpty(strings.Split(namesRaw, ","))
+	if len(names) == 0 {
+		return
+	}
+
+	policies := make([]UpstreamPromptPolicyRule, 0, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+
+		prefix := "UPSTREAM_PROMPT_POLICY_" + strings.ToUpper(name) + "_"
+
+		rule := UpstreamPromptPolicyRule{
+			Name:    name,
+			Enabled: true,
+		}
+
+		if v := os.Getenv(prefix + "ENABLED"); v != "" {
+			rule.Enabled = GetEnvBool(prefix+"ENABLED", true)
+		}
+		if v := os.Getenv(prefix + "MODE"); v != "" {
+			rule.Mode = v
+		}
+		if v := os.Getenv(prefix + "ACTION"); v != "" {
+			rule.Action = v
+		}
+		if v := os.Getenv(prefix + "PROMPT"); v != "" {
+			rule.Prompt = v
+		}
+
+		if v := os.Getenv(prefix + "MATCH_SCOPE"); v != "" {
+			rule.MatchScope = v
+		}
+		if v := os.Getenv(prefix + "MATCH_AUTHZ_DETAILS_TYPE"); v != "" {
+			rule.MatchAuthorizationDetailsType = v
+		}
+		if v := os.Getenv(prefix + "MATCH_CREDENTIAL_CONFIGURATION_ID"); v != "" {
+			rule.MatchCredentialConfigurationID = v
+		}
+
+		policies = append(policies, rule)
+	}
+
+	c.UpstreamPromptPolicies = policies
 }
