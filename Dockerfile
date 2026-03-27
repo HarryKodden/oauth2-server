@@ -1,5 +1,5 @@
 # Build stage
-FROM golang:1.25.5-alpine AS builder
+FROM golang:1.25.8-alpine AS builder
 
 # Install build dependencies including C compiler and SQLite dev libraries
 RUN apk add --no-cache git ca-certificates gcc musl-dev sqlite-dev
@@ -34,12 +34,17 @@ RUN VERSION=${VERSION:-$(git describe --tags --always 2>/dev/null || echo dev)} 
         -o oauth2-server \
         cmd/server/main.go
 
-# Final stage - use alpine for healthcheck capabilities
-FROM alpine:latest
+# Final stage - pin Alpine minor line and pull security fixes at build time
+FROM alpine:3.22
 
-# Install ca-certificates for HTTPS calls and SQLite runtime libraries
-RUN apk update && apk upgrade && \
-    apk add --no-cache ca-certificates curl sqlite-libs
+# Install runtime dependencies and explicitly upgrade OpenSSL runtime libs.
+# Trivy findings on libcrypto3/libssl3 are OS-layer CVEs, so we patch them here.
+RUN apk add --no-cache --upgrade \
+    ca-certificates \
+    curl \
+    sqlite-libs \
+    libcrypto3 \
+    libssl3
 
 # Copy binary from builder stage
 COPY --from=builder /app/oauth2-server /app/oauth2-server

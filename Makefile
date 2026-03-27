@@ -179,7 +179,7 @@ lint: fmt vet
 install-deps:
 	@echo "📦 Installing development dependencies..."
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+	go install github.com/securego/gosec/v2/cmd/gosec@latest
 	go install github.com/cosmtrek/air@latest
 	go install honnef.co/go/tools/cmd/staticcheck@latest
 	@echo "📍 Tools installed in: $(shell go env GOPATH)/bin"
@@ -222,13 +222,13 @@ security:
 	@echo "🔒 Checking for security vulnerabilities..."
 	@if command -v gosec >/dev/null 2>&1; then \
 		gosec ./...; \
-	#elif [ -f "$(shell go env GOPATH)/bin/gosec" ]; then \
-	#	$(shell go env GOPATH)/bin/gosec ./...; \
-	#else \
-	#	echo "Installing gosec..."; \
-	#	go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest; \
-	#	$(shell go env GOPATH)/bin/gosec ./...; \
-	#fi
+	elif [ -f "$(shell go env GOPATH)/bin/gosec" ]; then \
+		$(shell go env GOPATH)/bin/gosec ./...; \
+	else \
+		echo "Installing gosec..."; \
+		go install github.com/securego/gosec/v2/cmd/gosec@latest; \
+		$(shell go env GOPATH)/bin/gosec ./...; \
+	fi
 
 # Enhanced golangci-lint target
 golangci-lint:
