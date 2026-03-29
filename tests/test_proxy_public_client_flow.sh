@@ -2,7 +2,11 @@
 
 # Test Proxy Public Client Authorization Code Flow
 # This script tests the OAuth2 authorization code flow in proxy mode
-# where the downstream client is a public client and upstream is confidential
+# where the downstream client is a public client and upstream is confidential.
+#
+# Also verifies that upstream prompt policies (UPSTREAM_PROMPT_*) coexist with
+# issuer_state: the redirect to the IdP must include the policy prompt, and
+# privileged introspection must still return the original issuer_state.
 
 # Test configuration - use environment variables with defaults
 TEST_USERNAME="${TEST_USERNAME:-john.doe}"
@@ -108,8 +112,14 @@ if lsof -i :8080 > /dev/null 2>&1; then
     sleep 2
 fi
 
-# Start the OAuth2 server in proxy mode with the mock provider
-( UPSTREAM_PROVIDER_URL="$MOCK_PROVIDER_URL" UPSTREAM_CLIENT_ID="mock-client-id" UPSTREAM_CLIENT_SECRET="mock-client-secret" UPSTREAM_CALLBACK_URL="$SERVER_URL/callback" API_KEY="$API_KEY" LOG_LEVEL=debug ./bin/oauth2-server > server.log 2>&1 ) &
+# Start the OAuth2 server in proxy mode with the mock provider.
+# Named policy OPENID matches scope "openid" and sets prompt=login on the upstream redirect (see Step 4 check).
+( UPSTREAM_PROVIDER_URL="$MOCK_PROVIDER_URL" UPSTREAM_CLIENT_ID="mock-client-id" UPSTREAM_CLIENT_SECRET="mock-client-secret" UPSTREAM_CALLBACK_URL="$SERVER_URL/callback" API_KEY="$API_KEY" LOG_LEVEL=debug \
+  UPSTREAM_PROMPT_POLICIES=OPENID \
+  UPSTREAM_PROMPT_POLICY_OPENID_ACTION=set \
+  UPSTREAM_PROMPT_POLICY_OPENID_PROMPT=login \
+  UPSTREAM_PROMPT_POLICY_OPENID_MATCH_SCOPE=openid \
+  ./bin/oauth2-server > server.log 2>&1 ) &
 SERVER_PID=$!
 echo $SERVER_PID > server.pid
 
@@ -253,6 +263,14 @@ if [ -z "$UPSTREAM_AUTH_URL" ]; then
 fi
 
 echo "🔗 Upstream Authorization URL: $UPSTREAM_AUTH_URL"
+
+# Upstream prompt policy must be present on the IdP redirect (regression guard with issuer_state in the same flow)
+if ! echo "$UPSTREAM_AUTH_URL" | grep -q 'prompt=login'; then
+    print_status "error" "Upstream redirect missing prompt=login — upstream prompt policy may be broken or not applied"
+    echo "Expected a query parameter prompt=login from UPSTREAM_PROMPT_POLICY_OPENID_* (MATCH_SCOPE=openid)"
+    exit 1
+fi
+print_status "success" "Upstream redirect includes prompt=login (prompt policy + issuer_state in one flow)"
 
 # Extract state from upstream URL
 UPSTREAM_STATE=$(echo "$UPSTREAM_AUTH_URL" | sed 's/.*state=\([^&]*\).*/\1/')
@@ -426,6 +444,7 @@ if [ "$STEP3_PASS" = true ] && [ "$STEP4_PASS" = true ] && [ "$STEP5_PASS" = tru
     echo "   ✅ Authorization code exchange returns valid access token"
     echo "   ✅ UserInfo endpoint returns correct user data from upstream"
     echo "   ✅ Confidential client can introspect public client's access token"
+    echo "   ✅ Upstream prompt policy (prompt=login) applied together with issuer_state round-trip"
     exit 0
 else
     echo ""
