@@ -66,7 +66,15 @@ func (h *TokenHandler) storeIssuerStateInSession(r *http.Request, session *openi
 	if authCode != "" && h.AuthCodeToStateMap != nil {
 		h.Log.Printf("🔍 AuthCodeToStateMap has %d entries", len(*h.AuthCodeToStateMap))
 		for k, v := range *h.AuthCodeToStateMap {
-			h.Log.Printf("🔍 Map entry: %s -> %s", k[:10]+"...", v[:10]+"...")
+			keyPrefix := k
+			if len(keyPrefix) > 10 {
+				keyPrefix = keyPrefix[:10] + "..."
+			}
+			valuePrefix := v
+			if len(valuePrefix) > 10 {
+				valuePrefix = valuePrefix[:10] + "..."
+			}
+			h.Log.Printf("🔍 Map entry: %s -> %s", keyPrefix, valuePrefix)
 		}
 		if issuerState, exists := (*h.AuthCodeToStateMap)[authCode]; exists {
 			h.Log.Printf("🔍 Found issuer_state in map: %s", issuerState)
