@@ -1,0 +1,52 @@
+# Mirror this repository to Forgejo (homelab) as a third Git destination.
+#
+# Required repository secret (Forgejo / Gitea compatible):
+#   FORGEJO_TOKEN — personal access token with write access to the target repo
+#
+# Optional repository variable:
+#   FORGEJO_MIRROR_URL — full HTTPS clone URL without credentials, e.g.
+#     https://git.homelab.kodden.nl/harry/oauth2-server.git
+#   Default is set below if unset.
+
+name: Mirror to homelab Forgejo
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push mirror to Forgejo
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_MIRROR_URL: ${{ vars.FORGEJO_MIRROR_URL }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FORGEJO_TOKEN:-}" ]; then
+            echo "FORGEJO_TOKEN secret is not set; skipping homelab mirror."
+            exit 0
+          fi
+          TARGET_URL="${FORGEJO_MIRROR_URL:-https://git.homelab.kodden.nl/harry/oauth2-server.git}"
+          HOST_PATH="${TARGET_URL#https://}"
+          HOST_PATH="${HOST_PATH#http://}"
+          # Forgejo/Gitea: use oauth2 as username with PAT (or set username in token scope)
+          MIRROR_REMOTE="https://oauth2:${FORGEJO_TOKEN}@${HOST_PATH}"
+          git remote add homelab-forgejo "$MIRROR_REMOTE"
+          REF="${GITHUB_REF}"
+          if [[ "$REF" == refs/tags/* ]]; then
+            git push homelab-forgejo "$REF"
+          else
+            BRANCH="${GITHUB_REF#refs/heads/}"
+            git push homelab-forgejo "HEAD:refs/heads/${BRANCH}"
+          fi

@@ -1,0 +1,26 @@
+# Optional Argo CD Application: source repo on homelab Forgejo (third Git destination).
+# Use this instead of application.yaml when your cluster should pull Helm from Forgejo.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: oauth2-server-application-homelab
+  namespace: argocd
+spec:
+  project: default
+
+  source:
+    repoURL: https://git.homelab.kodden.nl/harry/oauth2-server.git
+    targetRevision: HEAD
+    path: helm
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: oauth2-server
+
+  syncPolicy:
+    syncOptions:
+      - CreateNamespace=true
+
+    automated:
+      selfHeal: true
+      prune: true

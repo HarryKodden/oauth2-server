@@ -101,6 +101,10 @@ Triggers on:
 4. Create GitHub release
 5. Upload binary artifacts
 
+### Homelab Forgejo mirror (`.github/workflows/mirror-homelab-forgejo.yml`)
+
+Pushes the same branch or tag to [Forgejo homelab](https://git.homelab.kodden.nl/harry/oauth2-server) when `FORGEJO_TOKEN` is configured. See [Git repository destinations](GIT_REMOTES.md).
+
 ## Docker Image Tags
 
 ### Tagging Strategy
