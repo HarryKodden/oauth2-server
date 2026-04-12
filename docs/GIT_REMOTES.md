@@ -46,14 +46,21 @@ To deploy from Forgejo instead of GitHub, point `repoURL` at the homelab clone U
 
 ## Homelab container registry (Docker push from CI)
 
-CI also pushes the same image tags to **`registry2.homelab.kodden.nl`** when enabled (alongside GHCR). Configure this in the GitHub repository.
+CI also pushes the same image tags to **`registry2.homelab.kodden.nl`** when enabled (alongside GHCR).
+
+**Where to configure (GitHub):** Repository **Settings → Secrets and variables → Actions**
+
+- **Variables** tab: `HOMELAB_DOCKER_PUSH`, `HOMELAB_IMAGE_PATH` (optional)
+- **Secrets** tab: `HOMELAB_REGISTRY_USERNAME`, `HOMELAB_REGISTRY_TOKEN`
 
 | Kind | Name | Description |
 |------|------|-------------|
-| Variable | `HOMELAB_DOCKER_PUSH` | Set to `true` to push to the homelab registry. |
+| Variable | `HOMELAB_DOCKER_PUSH` | Must enable the homelab push. Use `true`, `1`, `yes`, or `on` (case-insensitive). If this is missing or wrong, only GHCR gets images — check the workflow log step **Detect homelab registry push**. |
 | Variable | `HOMELAB_IMAGE_PATH` | Optional. Image path inside the registry (no hostname). Default: `harry/oauth2-server` → full image `registry2.homelab.kodden.nl/harry/oauth2-server`. |
 | Secret | `HOMELAB_REGISTRY_USERNAME` | Registry login (robot account or user). |
 | Secret | `HOMELAB_REGISTRY_TOKEN` | Registry password or token. |
+
+**Common mistake:** putting `HOMELAB_DOCKER_PUSH` under **Secrets** instead of **Variables**. Only **Variables** are read as `vars.HOMELAB_DOCKER_PUSH` in the workflow; a secret with the same name would **not** be used for this flag.
 
 Create a project/repository in Harbor/registry2 and grant the credential **push** rights. Tags mirror GHCR (branch names, semver, `latest` on default branch, etc.).
 
