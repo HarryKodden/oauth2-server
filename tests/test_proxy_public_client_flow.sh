@@ -25,7 +25,7 @@ echo ""
 
 SERVER_URL="${OAUTH2_SERVER_URL:-http://localhost:8080}"
 MOCK_PROVIDER_URL="http://localhost:9999"
-API_KEY="test-api-key"
+API_KEY="${API_KEY:-test-api-key}"
 
 # Function to URL encode a string
 url_encode() {
@@ -241,7 +241,7 @@ AUTH_RESPONSE=$(curl -s -i -X GET "$AUTH_URL" \
     -H "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)")
 
 # Check for redirect to upstream provider (proxy mode behavior)
-if echo "$AUTH_RESPONSE" | grep -q "302 Found" && echo "$AUTH_RESPONSE" | grep -q "Location: http://localhost:9999/authorize"; then
+if echo "$AUTH_RESPONSE" | grep -Eq "HTTP/[0-9.]+ 30[23] " && echo "$AUTH_RESPONSE" | grep -q "Location: http://localhost:9999/authorize"; then
     print_status "success" "Proxy authorization redirect successful - correctly forwarding to upstream provider"
     STEP3_PASS=true
 else
@@ -286,7 +286,7 @@ echo "🎲 Upstream State: $UPSTREAM_STATE"
 UPSTREAM_LOGIN_RESPONSE=$(curl -s -i -X GET "$UPSTREAM_AUTH_URL")
 
 # Check for redirect back to proxy callback with authorization code
-if echo "$UPSTREAM_LOGIN_RESPONSE" | grep -q "302 Found" && echo "$UPSTREAM_LOGIN_RESPONSE" | grep -q "Location: $SERVER_URL/callback"; then
+if echo "$UPSTREAM_LOGIN_RESPONSE" | grep -Eq "HTTP/[0-9.]+ 30[23] " && echo "$UPSTREAM_LOGIN_RESPONSE" | grep -q "Location: $SERVER_URL/callback"; then
     print_status "success" "Upstream login successful - redirecting back to proxy callback"
 else
     print_status "error" "Expected redirect back to proxy callback after upstream login"
@@ -308,7 +308,7 @@ print_status "success" "Upstream login successful - redirecting to proxy callbac
 CALLBACK_RESPONSE=$(curl -s -i "$CALLBACK_URL")
 
 # The callback should redirect back to the client redirect URI with the authorization code
-if echo "$CALLBACK_RESPONSE" | grep -q "302 Found" && echo "$CALLBACK_RESPONSE" | grep -q "Location:"; then
+if echo "$CALLBACK_RESPONSE" | grep -Eq "HTTP/[0-9.]+ 30[23] " && echo "$CALLBACK_RESPONSE" | grep -q "Location:"; then
     CLIENT_REDIRECT_URL=$(echo "$CALLBACK_RESPONSE" | grep -i "Location:" | sed 's/.*Location: //' | tr -d '\r\n')
     AUTH_CODE=$(echo "$CLIENT_REDIRECT_URL" | sed 's/.*code=\([^&]*\).*/\1/')
     

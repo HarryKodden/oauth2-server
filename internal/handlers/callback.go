@@ -123,7 +123,7 @@ func (h *CallbackHandler) completeProxyAuthorization(w http.ResponseWriter, r *h
 	redirectURL := fmt.Sprintf("%s%scode=%s&state=%s", redirect, sep, url.QueryEscape(code), url.QueryEscape(sess.OriginalState))
 
 	h.Log.Printf("✅ [PROXY-CALLBACK] Completing authorization, redirecting to: %s", redirectURL)
-	http.Redirect(w, r, redirectURL, http.StatusFound)
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
 
 // showProxyConsentScreen displays the consent screen for proxy mode
@@ -249,7 +249,7 @@ func (h *CallbackHandler) HandleProxyConsent(w http.ResponseWriter, r *http.Requ
 		// Redirect to client with access_denied error
 		errorURL := fmt.Sprintf("%s?error=access_denied&state=%s", sess.OriginalRedirectURI, sess.OriginalState)
 		h.Log.Printf("🔄 [PROXY-CONSENT] Redirecting to client with error: %s", errorURL)
-		http.Redirect(w, r, errorURL, http.StatusFound)
+		http.Redirect(w, r, errorURL, http.StatusSeeOther)
 		return
 	}
 

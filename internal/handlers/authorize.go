@@ -771,7 +771,7 @@ func (h *AuthorizeHandler) handleProxyAuthorize(w http.ResponseWriter, r *http.R
 	upstreamURL := authzEndpoint + "?" + vals.Encode()
 	h.Log.Printf("🔄 [PROXY-AUTH] Redirecting to upstream: %s", upstreamURL)
 
-	http.Redirect(w, r, upstreamURL, http.StatusFound)
+	http.Redirect(w, r, upstreamURL, http.StatusSeeOther)
 }
 
 // buildClaimsJSON builds a proper OIDC claims parameter JSON from a list of claim names

@@ -852,6 +852,8 @@ func corsAndProxyMiddleware(handler http.Handler) http.Handler {
 // Middleware for proxy awareness
 func proxyAwareMiddleware(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		normalizedQuery := middleware.NormalizeEscapedQuerySeparators(r)
+
 		// Store original values (with defaults for logging)
 		originalHost := r.Host
 		originalScheme := r.URL.Scheme
@@ -900,6 +902,9 @@ func proxyAwareMiddleware(handler http.Handler) http.Handler {
 			r.Method, r.RequestURI,
 			originalScheme, originalHost,
 			r.URL.Scheme, r.Host)
+		if normalizedQuery {
+			log.Printf("⚠️ Normalized escaped query separators for request path %s", r.URL.Path)
+		}
 
 		handler.ServeHTTP(w, r)
 	})

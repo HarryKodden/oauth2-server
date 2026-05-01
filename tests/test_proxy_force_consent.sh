@@ -114,13 +114,13 @@ AUTH_CHECK=$(curl -s -w "HTTP_CODE:%{http_code}\n" \
 
 HTTP_CODE=$(echo "$AUTH_CHECK" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
 
-if [ "$HTTP_CODE" != "302" ]; then
-    echo "❌ Expected redirect (302) but got: $HTTP_CODE"
+if [ "$HTTP_CODE" != "302" ] && [ "$HTTP_CODE" != "303" ]; then
+    echo "❌ Expected redirect (302 or 303) but got: $HTTP_CODE"
     echo "Response: $AUTH_CHECK"
     exit 1
 fi
 
-echo "✅ Authorization endpoint returned redirect (302) as expected"
+echo "✅ Authorization endpoint returned redirect ($HTTP_CODE) as expected"
 
 # Now follow redirects to get the final response (consent screen)
 echo "Following redirects with curl..."

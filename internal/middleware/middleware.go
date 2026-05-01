@@ -7,6 +7,30 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// NormalizeEscapedQuerySeparators converts HTML-escaped query separators to
+// plain '&' so net/url parsing does not fail on malformed incoming URLs.
+// It only mutates URL query data and returns true when a change was applied.
+func NormalizeEscapedQuerySeparators(r *http.Request) bool {
+	if r == nil || r.URL == nil {
+		return false
+	}
+
+	rawQuery := r.URL.RawQuery
+	if rawQuery == "" {
+		return false
+	}
+
+	normalized := strings.ReplaceAll(rawQuery, "&amp;", "&")
+	normalized = strings.ReplaceAll(normalized, `\u0026amp;`, "&")
+
+	if normalized == rawQuery {
+		return false
+	}
+
+	r.URL.RawQuery = normalized
+	return true
+}
+
 // APIKeyAuth middleware for API key authentication
 func APIKeyAuth(log *logrus.Logger, apiKey string) func(http.HandlerFunc) http.HandlerFunc {
 	return func(next http.HandlerFunc) http.HandlerFunc {

@@ -131,8 +131,8 @@ RESPONSE_BODY=$(echo "$AUTH_RESPONSE" | grep -v "HTTP_CODE:")
 echo "   HTTP Status Code: $HTTP_CODE"
 echo "   Response Body Length: ${#RESPONSE_BODY} characters"
 
-if [ "$HTTP_CODE" = "302" ]; then
-    echo "✅ Authorization endpoint returned redirect (302) as expected"
+if [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "303" ]; then
+    echo "✅ Authorization endpoint returned redirect ($HTTP_CODE) as expected"
     LOCATION=$(echo "$RESPONSE_BODY" | grep -i "location:" | sed 's/.*location: *//i' 2>/dev/null || echo "")
     if [ -n "$LOCATION" ]; then
         echo "   Redirect Location: $LOCATION"
@@ -147,8 +147,9 @@ fi
 echo "   Raw response: $AUTH_RESPONSE"
 
 # Check if we got a redirect
-if echo "$AUTH_RESPONSE" | grep -q "HTTP_CODE:302"; then
-    echo "✅ Got redirect response (302) as expected"
+if echo "$AUTH_RESPONSE" | grep -Eq "HTTP_CODE:(302|303)"; then
+    REDIRECT_CODE=$(echo "$AUTH_RESPONSE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')
+    echo "✅ Got redirect response ($REDIRECT_CODE) as expected"
     
     # Now try following redirects with a shorter timeout
     echo ""
@@ -157,7 +158,7 @@ if echo "$AUTH_RESPONSE" | grep -q "HTTP_CODE:302"; then
       -w "FINAL_URL:%{url_effective}\nHTTP_CODE:%{http_code}\nREDIRECT_COUNT:%{num_redirects}\n" \
       "$AUTH_URL" 2>/dev/null || echo "TIMEOUT_OR_ERROR")
 else
-    echo "❌ Expected redirect (302) but got: $(echo "$AUTH_RESPONSE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')"
+    echo "❌ Expected redirect (302 or 303) but got: $(echo "$AUTH_RESPONSE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')"
     exit 1
 fi
 

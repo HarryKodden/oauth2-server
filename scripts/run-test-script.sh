@@ -65,7 +65,15 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
         fi
     done
     
-    # Start OAuth2 server in proxy mode
+    # Some proxy tests manage their own OAuth2 server lifecycle.
+    # In those cases we only prepare the mock provider here.
+    PROXY_TEST_MANAGES_SERVER=""
+    if [ "$(basename "$SCRIPT")" = "test_proxy_public_client_flow.sh" ]; then
+        PROXY_TEST_MANAGES_SERVER="yes"
+        log "ℹ️  $SCRIPT manages its own OAuth2 server lifecycle; skipping wrapper server startup"
+    fi
+
+    # Start OAuth2 server in proxy mode (unless test script manages it itself)
     log "🚀 Starting OAuth2 server in proxy mode..."
     
     # Some proxy tests need additional proxy-mode env configuration.
@@ -76,61 +84,63 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
         log "🔧 Enabling upstream prompt policies for this test..."
     fi
 
-    if [ -n "$EXTRA_UPSTREAM_PROMPT_POLICY_ENV" ]; then
-        DATABASE_TYPE="$TEST_DATABASE_TYPE" \
-            UPSTREAM_PROVIDER_URL="http://localhost:9999" \
-            UPSTREAM_CLIENT_ID="upstream_client" \
-            UPSTREAM_CLIENT_SECRET="upstream_secret" \
-            ENABLE_TRUST_ANCHOR_API=true \
-            API_KEY="$API_KEY" \
-            UPSTREAM_PROMPT_POLICIES="EDUID_SCOPE,EDUID_AUTHZ_DETAILS" \
-            UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_ACTION="set" \
-            UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_PROMPT="login" \
-            UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_MATCH_SCOPE="eduID" \
-            UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_ACTION="set" \
-            UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_PROMPT="login" \
-            UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_AUTHZ_DETAILS_TYPE="openid_credential" \
-            UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_CREDENTIAL_CONFIGURATION_ID="eduID" \
-            ./bin/oauth2-server > server-test.log 2>&1 &
-    else
-        DATABASE_TYPE="$TEST_DATABASE_TYPE" \
-            UPSTREAM_PROVIDER_URL="http://localhost:9999" \
-            UPSTREAM_CLIENT_ID="upstream_client" \
-            UPSTREAM_CLIENT_SECRET="upstream_secret" \
-            ENABLE_TRUST_ANCHOR_API=true \
-            API_KEY="$API_KEY" \
-            ./bin/oauth2-server > server-test.log 2>&1 &
-    fi
-    echo $! > server.pid
-    
-    log "⏳ Waiting for server to start..."
-    sleep 5
-    
-    log "🔍 Testing server health..."
-    for i in 1 2 3 4 5; do
-        if curl -f -s --max-time 5 "$OAUTH2_SERVER_URL/health" > /dev/null 2>&1; then
-            log "✅ Server is healthy"
-            break
+    if [ -z "$PROXY_TEST_MANAGES_SERVER" ]; then
+        if [ -n "$EXTRA_UPSTREAM_PROMPT_POLICY_ENV" ]; then
+            DATABASE_TYPE="$TEST_DATABASE_TYPE" \
+                UPSTREAM_PROVIDER_URL="http://localhost:9999" \
+                UPSTREAM_CLIENT_ID="upstream_client" \
+                UPSTREAM_CLIENT_SECRET="upstream_secret" \
+                ENABLE_TRUST_ANCHOR_API=true \
+                API_KEY="$API_KEY" \
+                UPSTREAM_PROMPT_POLICIES="EDUID_SCOPE,EDUID_AUTHZ_DETAILS" \
+                UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_ACTION="set" \
+                UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_PROMPT="login" \
+                UPSTREAM_PROMPT_POLICY_EDUID_SCOPE_MATCH_SCOPE="eduID" \
+                UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_ACTION="set" \
+                UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_PROMPT="login" \
+                UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_AUTHZ_DETAILS_TYPE="openid_credential" \
+                UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_CREDENTIAL_CONFIGURATION_ID="eduID" \
+                ./bin/oauth2-server > server-test.log 2>&1 &
         else
-            log "⏳ Waiting for server to respond (attempt $i/5)..."
-            sleep 2
-            if [ $i -eq 5 ]; then
-                echo "❌ Server failed to start after 5 attempts"
-                cat server-test.log
-                if [ -f server.pid ]; then kill $(cat server.pid) 2>/dev/null || true; rm -f server.pid; fi
-                if [ -f mock_provider.pid ]; then kill $(cat mock_provider.pid) 2>/dev/null || true; rm -f mock_provider.pid mock_provider_test.py; fi
-                exit 1
-            fi
+            DATABASE_TYPE="$TEST_DATABASE_TYPE" \
+                UPSTREAM_PROVIDER_URL="http://localhost:9999" \
+                UPSTREAM_CLIENT_ID="upstream_client" \
+                UPSTREAM_CLIENT_SECRET="upstream_secret" \
+                ENABLE_TRUST_ANCHOR_API=true \
+                API_KEY="$API_KEY" \
+                ./bin/oauth2-server > server-test.log 2>&1 &
         fi
-    done
+        echo $! > server.pid
+
+        log "⏳ Waiting for server to start..."
+        sleep 5
+
+        log "🔍 Testing server health..."
+        for i in 1 2 3 4 5; do
+            if curl -f -s --max-time 5 "$OAUTH2_SERVER_URL/health" > /dev/null 2>&1; then
+                log "✅ Server is healthy"
+                break
+            else
+                log "⏳ Waiting for server to respond (attempt $i/5)..."
+                sleep 2
+                if [ $i -eq 5 ]; then
+                    echo "❌ Server failed to start after 5 attempts"
+                    cat server-test.log
+                    if [ -f server.pid ]; then kill $(cat server.pid) 2>/dev/null || true; rm -f server.pid; fi
+                    if [ -f mock_provider.pid ]; then kill $(cat mock_provider.pid) 2>/dev/null || true; rm -f mock_provider.pid mock_provider_test.py; fi
+                    exit 1
+                fi
+            fi
+        done
+    fi
     
     # Run the test
     log "✅ Proxy environment ready, running $SCRIPT..."
     if [ -n "$QUIET" ]; then
-        TEST_USERNAME="$TEST_USERNAME" TEST_PASSWORD="$TEST_PASSWORD" TEST_SCOPE="$TEST_SCOPE" bash "tests/$SCRIPT" > /dev/null 2>&1
+        TEST_USERNAME="$TEST_USERNAME" TEST_PASSWORD="$TEST_PASSWORD" TEST_SCOPE="$TEST_SCOPE" API_KEY="$API_KEY" bash "tests/$SCRIPT" > /dev/null 2>&1
         result=$?
     else
-        TEST_USERNAME="$TEST_USERNAME" TEST_PASSWORD="$TEST_PASSWORD" TEST_SCOPE="$TEST_SCOPE" bash "tests/$SCRIPT"
+        TEST_USERNAME="$TEST_USERNAME" TEST_PASSWORD="$TEST_PASSWORD" TEST_SCOPE="$TEST_SCOPE" API_KEY="$API_KEY" bash "tests/$SCRIPT"
         result=$?
     fi
     
