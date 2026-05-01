@@ -172,6 +172,9 @@ func (c *Config) LoadFromEnv() {
 	if allowSynthetic := os.Getenv("ALLOW_SYNTHETIC_ID_TOKEN"); allowSynthetic != "" {
 		c.Security.AllowSyntheticIDToken = GetEnvBool("ALLOW_SYNTHETIC_ID_TOKEN", false)
 	}
+	if requireProxyConsent := os.Getenv("REQUIRE_PROXY_CONSENT"); requireProxyConsent != "" {
+		c.Security.RequireProxyConsent = GetEnvBool("REQUIRE_PROXY_CONSENT", false)
+	}
 
 	// API protection configuration
 	if apiKey := os.Getenv("API_KEY"); apiKey != "" {

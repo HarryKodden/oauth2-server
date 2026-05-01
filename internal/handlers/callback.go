@@ -93,18 +93,24 @@ func (h *CallbackHandler) handleProxyCallback(w http.ResponseWriter, r *http.Req
 		h.Log.Printf("🔄 [PROXY] Stored authorization code -> original nonce mapping: %s -> %s", code[:20]+"...", sess.OriginalNonce)
 	}
 
-	// Check if client requires forced consent
+	// Check if consent screen should be shown before redirecting back downstream.
+	// Consent is required when globally enabled or when the client is configured with force_consent=true.
+	requiresConsent := h.Configuration.Security.RequireProxyConsent
 	if sess.ClientID != "" {
 		client, err := h.Storage.GetClient(r.Context(), sess.ClientID)
 		if err == nil {
 			if customClient, ok := client.(*types.CustomClient); ok && customClient.ForceConsent {
-				h.Log.Printf("🔐 [PROXY-CALLBACK] Client %s requires forced consent, showing consent screen", sess.ClientID)
-				h.showProxyConsentScreen(w, r, sess, code)
-				return
+				requiresConsent = true
 			}
 		} else {
 			h.Log.Warnf("⚠️ [PROXY-CALLBACK] Could not retrieve client %s for consent check: %v", sess.ClientID, err)
 		}
+	}
+	if requiresConsent {
+		h.Log.Printf("🔐 [PROXY-CALLBACK] Consent required for client %s (global=%t), showing consent screen",
+			sess.ClientID, h.Configuration.Security.RequireProxyConsent)
+		h.showProxyConsentScreen(w, r, sess, code)
+		return
 	}
 
 	// No forced consent required, proceed with normal redirect

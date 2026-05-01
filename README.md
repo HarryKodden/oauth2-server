@@ -427,6 +427,7 @@ UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_CREDENTIAL_CONFIGURATION_ID=edu
 | `REQUIRE_HTTPS` | bool | false | Require HTTPS for all OAuth2 endpoints |
 | `ENABLE_PKCE` | bool | true | Enable PKCE (Proof Key for Code Exchange) support |
 | `ALLOW_SYNTHETIC_ID_TOKEN` | bool | false | If upstream omits `id_token`, allow proxy to mint one (use with caution) |
+| `REQUIRE_PROXY_CONSENT` | bool | false | In proxy mode, always show a local consent screen after upstream callback and before redirecting downstream |
 | `API_KEY` | string | - | API key for protected endpoints (registration, trust anchor management) |
 | `ENABLE_REGISTRATION_API` | bool | false | Enable dynamic client registration API |
 | `ENABLE_TRUST_ANCHOR_API` | bool | false | Enable trust anchor management API for attestation |
@@ -519,7 +520,11 @@ API_KEY=your-api-key
 
 #### Proxy Mode Consent Screen
 
-When running in proxy mode with clients that have `force_consent=true`, the server intercepts the authorization flow after upstream authentication and presents a consent screen to the user. This allows users to explicitly approve or deny the client's access request.
+When running in proxy mode, the server can intercept the authorization flow after upstream authentication and present a local consent screen to the user before redirecting to the downstream client.
+
+Consent interception can be enabled in two ways:
+- Per client: set `force_consent=true` on that client
+- Globally: set `REQUIRE_PROXY_CONSENT=true` to require consent for all proxy authorization callbacks
 
 **Features:**
 - **Client Information**: Displays the requesting client name and redirect URI
@@ -530,7 +535,7 @@ When running in proxy mode with clients that have `force_consent=true`, the serv
 
 **Consent Screen Flow:**
 1. User authenticates with upstream provider (Google, etc.)
-2. Server redirects to consent screen if `force_consent=true`
+2. Server redirects to consent screen when consent is required (`force_consent=true` for the client or global `REQUIRE_PROXY_CONSENT=true`)
 3. User reviews client permissions and scopes
 4. User clicks "Authorize" to continue or "Deny" to cancel
 5. On approval: Authorization code is issued and user redirected to client

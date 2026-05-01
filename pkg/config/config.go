@@ -222,6 +222,7 @@ type SecurityConfig struct {
 	EnablePKCE                     bool   `yaml:"enable_pkce"`
 	RequireHTTPS                   bool   `yaml:"require_https"`
 	AllowSyntheticIDToken          bool   `yaml:"allow_synthetic_id_token"`
+	RequireProxyConsent            bool   `yaml:"require_proxy_consent"`
 
 	// API protection settings
 	APIKey                string `yaml:"api_key,omitempty" env:"API_KEY"`
