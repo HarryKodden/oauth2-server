@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"oauth2-server/internal/utils"
 	"os"
 	"strings"
@@ -399,12 +400,18 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("client %s: redirect URIs required for authorization_code grant", client.ID)
 		}
 
-		// Validate that all Redirect URIs are absolute or normalized
+		// Validate that all redirect URIs are absolute (including custom schemes)
+		// or normalized local paths (starting with "/")
 		for _, uri := range client.RedirectURIs {
 			if uri == "" {
 				return fmt.Errorf("client %s: redirect URI cannot be empty", client.ID)
 			}
-			if !strings.HasPrefix(uri, "http://") && !strings.HasPrefix(uri, "https://") && !strings.HasPrefix(uri, "/") {
+			if strings.HasPrefix(uri, "/") {
+				continue
+			}
+
+			parsedURI, err := url.Parse(uri)
+			if err != nil || !parsedURI.IsAbs() {
 				return fmt.Errorf("client %s: redirect URI must be absolute or normalized: %s", client.ID, uri)
 			}
 		}

@@ -45,6 +45,21 @@ check-port:
 		echo "✅ Port 8080 is available."; \
 	fi
 
+# Non-interactive check for CI/quiet test execution
+check-port-noninteractive:
+	@echo "🔍 Checking if port 8080 is available..."
+	@if lsof -i :8080 >/dev/null 2>&1; then \
+		echo "❌ Port 8080 is already in use. Cannot run test suite."; \
+		echo "   Processes using port 8080:"; \
+		lsof -nP -iTCP:8080 -sTCP:LISTEN; \
+		echo ""; \
+		echo "💡 Free the port and re-run:"; \
+		echo "   lsof -ti :8080 | xargs kill -9"; \
+		exit 1; \
+	else \
+		echo "✅ Port 8080 is available."; \
+	fi
+
 # Start mock upstream provider for proxy tests
 start-mock-provider:
 	@echo "🔄 Starting mock upstream OAuth2 provider..."
@@ -261,7 +276,7 @@ setup-env:
 	@echo "export PATH=\"$(shell go env GOPATH)/bin:\$$PATH\""
 
 # Test target - runs all test scripts with server lifecycle management and isolation (quiet mode)
-test: build
+test: build check-port-noninteractive
 	@echo "🧪 Starting automated test suite with test isolation..."
 	@passed=0; failed=0; failed_tests=""; \
 	for script in tests/test_*.sh; do \
@@ -300,7 +315,7 @@ test: build
 	fi
 
 # Test with verbose output and isolation
-test-verbose: build
+test-verbose: build check-port-noninteractive
 	@echo "🧪 Starting automated test suite (verbose mode with isolation)..."
 	@echo "📦 Building server..."
 	@$(MAKE) build
