@@ -7,13 +7,17 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g., v1.2.3)'
+        description: 'Existing release tag to (re)publish (e.g., v1.2.3)'
         required: true
         type: string
 
 permissions:
   contents: write
   packages: write
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
@@ -23,10 +27,33 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve release tag
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.version }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Release tag: $TAG"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: refs/tags/${{ steps.version.outputs.tag }}
           fetch-depth: 0
+
+      - name: Verify tag exists
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.version.outputs.tag }}"
+          if ! git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG does not exist."
+            echo "Create it locally with: make tag"
+            exit 1
+          fi
 
       - name: Set up Go
         uses: actions/setup-go@v4
@@ -42,50 +69,27 @@ jobs:
       - name: Generate changelog
         id: changelog
         run: |
-          # Get the latest tag (or create initial version)
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          
-          # Get current tag or use input
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            CURRENT_TAG="${{ github.event.inputs.version }}"
-          else
-            CURRENT_TAG="${{ github.ref_name }}"
-          fi
-          
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "current_tag=$CURRENT_TAG" >> $GITHUB_OUTPUT
-          
-          # Generate changelog
+          set -euo pipefail
+          CURRENT_TAG="${{ steps.version.outputs.tag }}"
+          LATEST_TAG=$(git describe --tags --abbrev=0 "${CURRENT_TAG}^" 2>/dev/null || echo "v0.0.0")
+
+          echo "latest_tag=$LATEST_TAG" >> "$GITHUB_OUTPUT"
+          echo "current_tag=$CURRENT_TAG" >> "$GITHUB_OUTPUT"
+
           {
             echo "## What's Changed"
             echo ""
-            git log --pretty=format:"- %s (%h)" $LATEST_TAG..HEAD --no-merges
+            git log --pretty=format:"- %s (%h)" "$LATEST_TAG..$CURRENT_TAG" --no-merges
             echo ""
             echo ""
             echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/$LATEST_TAG...$CURRENT_TAG"
           } > CHANGELOG.md
-          
-          # Store changelog for release notes
+
           {
             echo 'CHANGELOG<<EOF'
             cat CHANGELOG.md
             echo EOF
-          } >> $GITHUB_OUTPUT
-
-      - name: Create tag (if workflow_dispatch)
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          # Check if tag already exists
-          if git rev-parse "${{ github.event.inputs.version }}" >/dev/null 2>&1; then
-            echo "Tag ${{ github.event.inputs.version }} already exists, skipping creation"
-          else
-            echo "Creating tag ${{ github.event.inputs.version }}"
-            git tag -a "${{ github.event.inputs.version }}" -m "Release ${{ github.event.inputs.version }}"
-            git push origin "${{ github.event.inputs.version }}"
-          fi
+          } >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -127,42 +131,43 @@ jobs:
             GIT_COMMIT=${{ github.sha }}
             BUILD_TIME=${{ env.BUILD_TIME }}
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         run: |
-          # Create release using GitHub CLI
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # For manual dispatch, create draft release
-            gh release create ${{ steps.changelog.outputs.current_tag }} \
-              --title "Release ${{ steps.changelog.outputs.current_tag }}" \
-              --notes "${{ steps.changelog.outputs.CHANGELOG }}" \
-              --draft \
-              --prerelease=${{ contains(steps.changelog.outputs.current_tag, '-') }}
+          set -euo pipefail
+          TAG="${{ steps.changelog.outputs.current_tag }}"
+          PRERELEASE="${{ contains(steps.changelog.outputs.current_tag, '-') }}"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; updating notes only."
+            gh release edit "$TAG" \
+              --title "Release $TAG" \
+              --notes-file CHANGELOG.md \
+              --prerelease="$PRERELEASE"
           else
-            # For tag push, create regular release
-            gh release create ${{ steps.changelog.outputs.current_tag }} \
-              --title "Release ${{ steps.changelog.outputs.current_tag }}" \
-              --notes "${{ steps.changelog.outputs.CHANGELOG }}" \
-              --prerelease=${{ contains(steps.changelog.outputs.current_tag, '-') }}
+            gh release create "$TAG" \
+              --title "Release $TAG" \
+              --notes-file CHANGELOG.md \
+              --prerelease="$PRERELEASE"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload release assets
         run: |
+          set -euo pipefail
+          TAG="${{ steps.changelog.outputs.current_tag }}"
           BUILD_TIME="${BUILD_TIME:-$(date -u +'%Y-%m-%dT%H:%M:%SZ')}"
-          GIT_COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-8)
-          # Build binary for release
-          LD_FLAGS="-X main.Version=${{ steps.changelog.outputs.current_tag }} -X main.GitCommit=${GIT_COMMIT_SHORT} -X main.BuildTime=${BUILD_TIME}"
+          GIT_COMMIT_SHORT=$(git rev-parse --short HEAD)
+          LD_FLAGS="-X main.Version=${TAG} -X main.GitCommit=${GIT_COMMIT_SHORT} -X main.BuildTime=${BUILD_TIME}"
+
           GOOS=linux GOARCH=amd64 go build -ldflags "${LD_FLAGS}" -o oauth2-server-linux-amd64 ./cmd/server
           GOOS=linux GOARCH=arm64 go build -ldflags "${LD_FLAGS}" -o oauth2-server-linux-arm64 ./cmd/server
           GOOS=darwin GOARCH=amd64 go build -ldflags "${LD_FLAGS}" -o oauth2-server-darwin-amd64 ./cmd/server
           GOOS=darwin GOARCH=arm64 go build -ldflags "${LD_FLAGS}" -o oauth2-server-darwin-arm64 ./cmd/server
           GOOS=windows GOARCH=amd64 go build -ldflags "${LD_FLAGS}" -o oauth2-server-windows-amd64.exe ./cmd/server
-          
-          # Create checksums
+
           sha256sum oauth2-server-* > checksums.txt
-          
-          # Upload using GitHub CLI
-          gh release upload ${{ steps.changelog.outputs.current_tag }} oauth2-server-* checksums.txt
+
+          gh release upload "$TAG" oauth2-server-* checksums.txt --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

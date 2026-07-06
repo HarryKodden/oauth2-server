@@ -148,5 +148,5 @@ print_info "GitHub Actions will now build and publish the release."
 print_info "Check the progress at: https://github.com/$(git config --get remote.origin.url | sed 's/.*github.com[:/]\([^.]*\).*/\1/')/actions"
 
 echo
-print_info "You can also manually trigger a release with:"
+print_info "To re-publish an existing release (rebuild assets), run:"
 print_info "gh workflow run release.yml -f version=$NEW_VERSION"

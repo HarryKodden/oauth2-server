@@ -492,7 +492,7 @@ help:
 	@echo "Version Management:"
 	@echo "  tag                - Create and push a new version tag"
 	@echo "  version            - Show version information"
-	@echo "  release            - Trigger GitHub release workflow"
+	@echo "  release            - Create and push a version tag (triggers release workflow)"
 	@echo ""
 	@echo "Testing:"
 	@echo "  test               - Run all test scripts with server lifecycle (includes port check)"
@@ -569,17 +569,8 @@ build-version:
 		-o bin/oauth2-server cmd/server/main.go
 	@echo "✅ Build completed: bin/oauth2-server"
 
-# Manual release (for testing)
-release:
-	@echo "🚀 Triggering release workflow..."
-	@if ! command -v gh >/dev/null 2>&1; then \
-		echo "❌ GitHub CLI (gh) is required for releases"; \
-		echo "Install with: brew install gh"; \
-		exit 1; \
-	fi
-	@read -p "Enter version (e.g., v1.2.3): " VERSION; \
-	gh workflow run release.yml -f version=$$VERSION
-	@echo "✅ Release workflow triggered. Check GitHub Actions for progress."
+# Manual release: create and push a version tag (triggers release.yml once)
+release: tag
 
 # Update existing targets to use the new patterns
 # Pre-commit checks with better tool handling
