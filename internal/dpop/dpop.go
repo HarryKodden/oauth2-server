@@ -99,12 +99,12 @@ func (s *NonceStore) Consume(nonce string) error {
 
 // Verifier validates DPoP proofs and tracks jti values for replay protection.
 type Verifier struct {
-	MaxSkew    time.Duration
-	Nonces     *NonceStore
+	MaxSkew      time.Duration
+	Nonces       *NonceStore
 	RequireNonce bool
-	jtiTTL     time.Duration
-	seen       sync.Map // jti -> expiry unix
-	cleanOnce  sync.Once
+	jtiTTL       time.Duration
+	seen         sync.Map // jti -> expiry unix
+	cleanOnce    sync.Once
 }
 
 // NewVerifier creates a DPoP verifier with the given clock-skew tolerance.
