@@ -44,26 +44,6 @@ If the secret is absent, the job exits successfully without pushing (forks stay 
 
 To deploy from Forgejo instead of GitHub, point `repoURL` at the homelab clone URL. See [`helm/oauth2-server/argocd/application-homelab-forgejo.yaml`](../helm/oauth2-server/argocd/application-homelab-forgejo.yaml).
 
-## Homelab container registry (Docker push from CI)
+Container images are published to **GHCR** only (`ghcr.io/<owner>/<repo>`). Pull from there in homelab deployments, for example:
 
-CI also pushes the same image tags to **`registry2.homelab.kodden.nl`** when enabled (alongside GHCR).
-
-**Where to configure (GitHub):** Repository **Settings → Secrets and variables → Actions**
-
-- **Variables** tab: `HOMELAB_DOCKER_PUSH`, `HOMELAB_IMAGE_PATH` (optional)
-- **Secrets** tab (optional): `HOMELAB_REGISTRY_USERNAME`, `HOMELAB_REGISTRY_TOKEN` — omit both if your registry allows push without login (CI skips `docker login` for homelab).
-
-| Kind | Name | Description |
-|------|------|-------------|
-| Variable | `HOMELAB_DOCKER_PUSH` | Must enable the homelab push. Use `true`, `1`, `yes`, or `on` (case-insensitive). If this is missing or wrong, only GHCR gets images — check the workflow log step **Detect homelab registry push**. |
-| Variable | `HOMELAB_IMAGE_PATH` | Optional. Image path inside the registry (no hostname). Default: `harry/oauth2-server` → full image `registry2.homelab.kodden.nl/harry/oauth2-server`. |
-| Secret | `HOMELAB_REGISTRY_USERNAME` | Optional. Set together with `HOMELAB_REGISTRY_TOKEN` when the registry requires authentication; if either is unset, the workflow does not run `docker login` for homelab. |
-| Secret | `HOMELAB_REGISTRY_TOKEN` | Optional. Registry password or token (pair with username above). |
-
-**Common mistake:** putting `HOMELAB_DOCKER_PUSH` under **Secrets** instead of **Variables**. Only **Variables** are read as `vars.HOMELAB_DOCKER_PUSH` in the workflow; a secret with the same name would **not** be used for this flag.
-
-Create a project/repository in Harbor/registry2. If you use credentials, grant them **push** rights; otherwise configure the registry so unauthenticated pushes are allowed from CI if that is your model. Tags mirror GHCR (branch names, semver, `latest` on default branch, etc.).
-
-Example pull:
-
-`docker pull registry2.homelab.kodden.nl/harry/oauth2-server:latest`
+`docker pull ghcr.io/harrykodden/oauth2-server:latest`

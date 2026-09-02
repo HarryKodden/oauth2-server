@@ -127,11 +127,26 @@ type Config struct {
 	// CIMD / Client-Initiated Metadata Discovery configuration
 	CIMD *CIMDConfig `yaml:"cimd,omitempty"`
 
+	// DPoP (RFC 9449) configuration — opt-in sender-constraining of tokens
+	DPoP *DPoPConfig `yaml:"dpop,omitempty"`
+
 	// Reverse Proxy Configuration (can be overridden by YAML)
 	TrustProxyHeaders bool
 	// PublicBaseURL     string
 	ForceHTTPS     bool
 	TrustedProxies string
+}
+
+// DPoPConfig controls RFC 9449 Demonstrating Proof of Possession support.
+type DPoPConfig struct {
+	// Enabled turns on optional DPoP: clients that send a DPoP header get bound tokens.
+	Enabled bool `yaml:"enabled"`
+	// Required rejects token requests that do not include a valid DPoP proof when Enabled.
+	Required bool `yaml:"required"`
+	// MaxClockSkewSeconds is the allowed |now - iat| window for proofs (default 120).
+	MaxClockSkewSeconds int `yaml:"max_clock_skew_seconds"`
+	// NonceRequired requires proofs to include a server-issued nonce (RFC 9449 §8).
+	NonceRequired bool `yaml:"nonce_required"`
 }
 
 // UpstreamPromptPolicyRule is a single named policy for deciding how to set or remove the upstream OIDC "prompt" parameter.
@@ -572,6 +587,14 @@ func (c *Config) SetDefaults() {
 	// Ensure attestation block exists so handlers can safely check fields
 	if c.Attestation == nil {
 		c.Attestation = &AttestationConfig{}
+	}
+
+	// DPoP defaults (disabled unless explicitly enabled)
+	if c.DPoP == nil {
+		c.DPoP = &DPoPConfig{}
+	}
+	if c.DPoP.MaxClockSkewSeconds <= 0 {
+		c.DPoP.MaxClockSkewSeconds = 120
 	}
 
 	// Set default CIMD configuration

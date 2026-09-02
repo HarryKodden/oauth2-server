@@ -169,6 +169,25 @@ func (c *Config) LoadFromEnv() {
 		c.Security.EnablePKCE = GetEnvBool("ENABLE_PKCE", true)
 	}
 
+	// DPoP (RFC 9449)
+	if c.DPoP == nil {
+		c.DPoP = &DPoPConfig{}
+	}
+	if v := os.Getenv("DPOP_ENABLED"); v != "" {
+		c.DPoP.Enabled = GetEnvBool("DPOP_ENABLED", false)
+	}
+	if v := os.Getenv("DPOP_REQUIRED"); v != "" {
+		c.DPoP.Required = GetEnvBool("DPOP_REQUIRED", false)
+	}
+	if v := os.Getenv("DPOP_NONCE_REQUIRED"); v != "" {
+		c.DPoP.NonceRequired = GetEnvBool("DPOP_NONCE_REQUIRED", false)
+	}
+	if v := os.Getenv("DPOP_MAX_CLOCK_SKEW_SECONDS"); v != "" {
+		if i := GetEnvInt("DPOP_MAX_CLOCK_SKEW_SECONDS", 0); i > 0 {
+			c.DPoP.MaxClockSkewSeconds = i
+		}
+	}
+
 	if allowSynthetic := os.Getenv("ALLOW_SYNTHETIC_ID_TOKEN"); allowSynthetic != "" {
 		c.Security.AllowSyntheticIDToken = GetEnvBool("ALLOW_SYNTHETIC_ID_TOKEN", false)
 	}

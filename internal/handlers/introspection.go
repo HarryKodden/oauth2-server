@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"oauth2-server/internal/attestation"
+	"oauth2-server/internal/dpop"
 	"oauth2-server/internal/store"
 	"oauth2-server/pkg/config"
 	"strings"
@@ -428,6 +429,15 @@ func (h *IntrospectionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		// issuer_state and attestation info are now automatically included by Fosite
 		// from the token claims that were stored during token creation
 		h.Log.Debugf("🔍 Token is active, checking for stored claims")
+
+		// RFC 9449: include cnf.jkt for DPoP-bound tokens
+		if resp, ok := ir.(*fosite.IntrospectionResponse); ok && resp.AccessRequester != nil {
+			if jkt := getDPoPJKTFromSession(resp.AccessRequester.GetSession()); jkt != "" {
+				response["cnf"] = dpop.ConfirmationClaim(jkt)
+				response["token_type"] = dpop.TokenType
+				h.Log.Debugf("🔍 Added DPoP cnf.jkt to introspection response")
+			}
+		}
 
 		// If audience is not included in the response, try to get it from the client
 		if _, hasAud := response["aud"]; !hasAud {

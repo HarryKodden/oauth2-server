@@ -101,6 +101,7 @@ var (
 // Maps for persisting original authorization state through the OAuth2 flow in proxy mode
 var authCodeToStateMap = make(map[string]string)                          // authorization_code -> original_state
 var authCodeToNonceMap = make(map[string]string)                          // authorization_code -> original_nonce
+var authCodeToDPoPJKTMap = make(map[string]string)                        // authorization_code -> dpop_jkt
 var deviceCodeToUpstreamMap = make(map[string]handlers.DeviceCodeMapping) // proxy_device_code -> upstream device code mapping
 var accessTokenToIssuerStateMap = make(map[string]string)                 // access_token -> issuer_state
 var UpstreamSessionMap = make(map[string]handlers.UpstreamSessionData)    // proxy_state -> upstream session data
@@ -671,7 +672,7 @@ func initializeHandlers() {
 
 	// Initialize OAuth2 flow handlers
 	authorizeHandler = handlers.NewAuthorizeHandler(oauth2Provider, configuration, log, metricsCollector, customStorage, &UpstreamSessionMap)
-	tokenHandler = handlers.NewTokenHandler(oauth2Provider, configuration, log, metricsCollector, attestationManager, customStorage, secretManager, &authCodeToStateMap, &authCodeToNonceMap, &deviceCodeToUpstreamMap, &accessTokenToIssuerStateMap, AccessTokenStrategy, RefreshTokenStrategy, jwtSigner)
+	tokenHandler = handlers.NewTokenHandler(oauth2Provider, configuration, log, metricsCollector, attestationManager, customStorage, secretManager, &authCodeToStateMap, &authCodeToNonceMap, &authCodeToDPoPJKTMap, &deviceCodeToUpstreamMap, &accessTokenToIssuerStateMap, AccessTokenStrategy, RefreshTokenStrategy, jwtSigner)
 	introspectionHandler = handlers.NewIntrospectionHandler(oauth2Provider, configuration, log, attestationManager, dataStore, secretManager, privilegedClientSecrets, &accessTokenToIssuerStateMap)
 	authorizationIntrospectionHandler = handlers.NewAuthorizationIntrospectionHandler(oauth2Provider, configuration, log, dataStore, secretManager, privilegedClientSecrets, &accessTokenToIssuerStateMap)
 	revokeHandler = handlers.NewRevokeHandler(oauth2Provider, log)
@@ -690,7 +691,7 @@ func initializeHandlers() {
 	statusHandler = handlers.NewStatusHandler(configuration, Version, GitCommit, BuildTime)
 	versionHandler = handlers.NewVersionHandler()
 	claimsHandler = handlers.NewClaimsHandler(configuration, log)
-	callbackHandler = handlers.NewCallbackHandler(configuration, log, &UpstreamSessionMap, &authCodeToStateMap, &authCodeToNonceMap, claimsHandler, customStorage)
+	callbackHandler = handlers.NewCallbackHandler(configuration, log, &UpstreamSessionMap, &authCodeToStateMap, &authCodeToNonceMap, &authCodeToDPoPJKTMap, claimsHandler, customStorage)
 
 	// Initialize device flow handler
 	deviceCodeHandler = handlers.NewDeviceCodeHandler(oauth2Provider, dataStore, secretManager, templates, configuration, log, &deviceCodeToUpstreamMap, &UpstreamSessionMap)
@@ -836,7 +837,7 @@ func corsAndProxyMiddleware(handler http.Handler) http.Handler {
 		}
 		w.Header().Set("Access-Control-Allow-Origin", allowOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key, DPoP")
 		if allowOrigin != "*" {
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}

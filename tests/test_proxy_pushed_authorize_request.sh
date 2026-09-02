@@ -9,6 +9,8 @@ set -e
 SERVER_URL="${SERVER_URL:-http://localhost:8080}"
 MOCK_PROVIDER_URL="${MOCK_PROVIDER_URL:-http://localhost:9999}"
 API_KEY="${API_KEY:-super-secure-random-api-key-change-in-production-32-chars-minimum}"
+# Use an unused high port: 8081 is often an SSH tunnel (e.g. MidPoint) on developer machines.
+CLIENT_REDIRECT_URI="http://127.0.0.1:34567/callback"
 
 echo "🧪 Proxy Mode Pushed Authorization Request (PAR) Test"
 echo "===================================================="
@@ -98,7 +100,7 @@ CLIENT_RESPONSE=$(curl -s -X POST "$SERVER_URL/register" \
         \"client_name\": \"Proxy PAR Test Client\",
         \"grant_types\": [\"authorization_code\"],
         \"response_types\": [\"code\"],
-        \"redirect_uris\": [\"${SERVER_URL}/callback\"],
+        \"redirect_uris\": [\"${CLIENT_REDIRECT_URI}\"],
         \"scope\": \"openid profile email\"
     }")
 
@@ -116,7 +118,7 @@ print_status "success" "Client registered with ID: $CLIENT_ID"
 print_status "info" "Step 2: Testing PAR request in proxy mode..."
 PAR_RESPONSE=$(curl -s -X POST "$SERVER_URL/authorize" \
     -H "Content-Type: application/x-www-form-urlencoded" \
-    -d "client_id=$CLIENT_ID&response_type=code&scope=openid%20profile&redirect_uri=${SERVER_URL}/callback&state=test-state")
+    -d "client_id=$CLIENT_ID&response_type=code&scope=openid%20profile&redirect_uri=${CLIENT_REDIRECT_URI}&state=test-state")
 
 echo "$PAR_RESPONSE" | grep -o '"request_uri":"[^"]*"' | cut -d'"' -f4 > /dev/null
 if [ $? -ne 0 ]; then
@@ -156,7 +158,7 @@ print_status "info" "Step 4: Testing authorization with request_uri..."
 AUTH_URL="$SERVER_URL/authorize?request_uri=$REQUEST_URI&client_id=$CLIENT_ID"
 
 AUTH_RESPONSE=$(curl -s -I "$AUTH_URL" | head -n 1)
-if echo "$AUTH_RESPONSE" | grep -q "302\|200"; then
+if echo "$AUTH_RESPONSE" | grep -qE "302|303|200"; then
     print_status "success" "Authorization endpoint accepts request_uri parameter"
 else
     print_status "error" "Authorization endpoint rejected request_uri parameter"
@@ -167,13 +169,13 @@ fi
 print_status "info" "Step 5: Simulating full PAR authorization flow..."
 
 # Use curl to follow redirects and capture the final redirect URL
-AUTH_URL="$SERVER_URL/authorize?request_uri=$REQUEST_URI&client_id=$CLIENT_ID"
-echo "Making request to: $AUTH_URL&redirect_uri=http://localhost:8081/callback"
+AUTH_URL="$SERVER_URL/authorize?request_uri=$REQUEST_URI&client_id=$CLIENT_ID&redirect_uri=${CLIENT_REDIRECT_URI}"
+echo "Making request to: $AUTH_URL"
 
-# Follow redirects and capture the final URL
+# Follow redirects; client redirect port must refuse so FINAL_URL keeps ?code=
 AUTH_REDIRECT_OUTPUT=$(timeout 15 curl -s -L --connect-timeout 3 --max-time 5 \
   -w "FINAL_URL:%{url_effective}\nHTTP_CODE:%{http_code}\nREDIRECT_COUNT:%{num_redirects}\n" \
-  "$AUTH_URL&redirect_uri=http://localhost:8081/callback" 2>/dev/null || echo "TIMEOUT_OR_ERROR")
+  "$AUTH_URL" 2>/dev/null || true)
 
 # Extract the final URL and check if it contains an authorization code
 FINAL_URL=$(echo "$AUTH_REDIRECT_OUTPUT" | grep "FINAL_URL:" | sed 's/FINAL_URL://' 2>/dev/null || echo "")
@@ -205,7 +207,7 @@ CLIENT_SECRET=$(echo "$CLIENT_RESPONSE" | grep -o '"client_secret":"[^"]*"' | cu
 TOKEN_RESPONSE=$(curl -s -X POST "$SERVER_URL/token" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -u "$CLIENT_ID:$CLIENT_SECRET" \
-  -d "grant_type=authorization_code&code=$AUTH_CODE&redirect_uri=http://localhost:8081/callback")
+  -d "grant_type=authorization_code&code=$AUTH_CODE&redirect_uri=${CLIENT_REDIRECT_URI}")
 
 echo "   Token exchange response:"
 echo "$TOKEN_RESPONSE" | jq . 2>/dev/null || echo "$TOKEN_RESPONSE"

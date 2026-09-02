@@ -36,6 +36,13 @@ database:
   type: "memory" # Options: "memory", "sqlite", or "postgres"
   path: "oauth2.db" # SQLite database file path (only used when type is "sqlite") or PostgreSQL connection string (when type is "postgres")
 
+# RFC 9449 DPoP (opt-in). Prefer DPOP_ENABLED=true env in production/tests.
+dpop:
+  enabled: false
+  required: false
+  nonce_required: false
+  max_clock_skew_seconds: 120
+
 # OAuth 2.0 Attestation-Based Client Authentication
 # https://datatracker.ietf.org/doc/html/draft-ietf-oauth-attestation-based-client-auth-07
 attestation:

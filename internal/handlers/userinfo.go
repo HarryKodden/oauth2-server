@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"oauth2-server/internal/dpop"
 	"oauth2-server/internal/metrics"
 	"oauth2-server/internal/store"
 	"oauth2-server/pkg/config"
@@ -44,7 +45,7 @@ func (h *UserInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract bearer token
+	// Extract bearer or DPoP access token
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		if h.Metrics != nil {
@@ -55,17 +56,23 @@ func (h *UserInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
+	scheme, token, ok := extractAccessTokenFromAuth(authHeader)
+	if !ok {
 		if h.Metrics != nil {
 			h.Metrics.RecordUserinfoRequest("error", "invalid_auth_header")
 		}
-		w.Header().Set("WWW-Authenticate", "Bearer")
+		w.Header().Set("WWW-Authenticate", "Bearer, DPoP")
 		http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
 		return
 	}
-
-	token := parts[1]
+	if !strings.EqualFold(scheme, "Bearer") && !strings.EqualFold(scheme, dpop.AuthScheme) {
+		if h.Metrics != nil {
+			h.Metrics.RecordUserinfoRequest("error", "invalid_auth_header")
+		}
+		w.Header().Set("WWW-Authenticate", "Bearer, DPoP")
+		http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
+		return
+	}
 
 	// Use fosite's introspection to validate the token
 	ctx := r.Context()
@@ -78,6 +85,27 @@ func (h *UserInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token", error_description="The access token is invalid or has expired."`)
 		http.Error(w, "Invalid access token", http.StatusUnauthorized)
+		return
+	}
+
+	// RFC 9449: DPoP-bound tokens require a matching DPoP proof
+	if h.Configuration.DPoP != nil && h.Configuration.DPoP.Enabled {
+		baseURL := h.Configuration.GetEffectiveBaseURL(r)
+		skew := h.Configuration.DPoP.MaxClockSkewSeconds
+		nonceRequired := h.Configuration.DPoP.NonceRequired
+		if err := requireDPoPForBoundToken(r, baseURL, sharedDPoPVerifier(skew, nonceRequired), requester.GetSession(), scheme, token); err != nil {
+			h.Log.Errorf("❌ UserInfo: DPoP validation failed: %v", err)
+			if h.Metrics != nil {
+				h.Metrics.RecordUserinfoRequest("error", "invalid_dpop")
+			}
+			w.Header().Set("WWW-Authenticate", `DPoP error="invalid_dpop_proof", error_description="DPoP proof is required or invalid for this token."`)
+			http.Error(w, "Invalid DPoP proof", http.StatusUnauthorized)
+			return
+		}
+	} else if strings.EqualFold(scheme, dpop.AuthScheme) {
+		// DPoP disabled — only Bearer accepted
+		w.Header().Set("WWW-Authenticate", "Bearer")
+		http.Error(w, "DPoP is not enabled on this server", http.StatusUnauthorized)
 		return
 	}
 

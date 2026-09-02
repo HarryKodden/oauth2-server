@@ -242,6 +242,18 @@ func (h *AuthorizeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	mySessionData.Claims.Extra["granted_scopes"] = ar.GetGrantedScopes()
 
+	// RFC 9449 §10: bind authorization code to DPoP key when dpop_jkt / DPoP proof provided
+	if h.Configuration.DPoP != nil && h.Configuration.DPoP.Enabled {
+		if jkt, err := extractAuthorizeDPoPJKT(r); err != nil {
+			h.Log.Errorf("❌ Invalid DPoP binding on authorize: %v", err)
+			http.Error(w, "Invalid DPoP proof", http.StatusBadRequest)
+			return
+		} else if jkt != "" {
+			mySessionData.Claims.Extra["dpop_jkt"] = jkt
+			h.Log.Printf("✅ Stored dpop_jkt authorization binding: %s", jkt)
+		}
+	}
+
 	// Store the original state from the authorization request in the session
 	// This will be available during userinfo requests
 	issuerState := r.URL.Query().Get("issuer_state")
@@ -529,6 +541,17 @@ func (h *AuthorizeHandler) handleProxyAuthorize(w http.ResponseWriter, r *http.R
 	originalIssuerState := q.Get("issuer_state")
 	originalCodeChallenge := q.Get("code_challenge")
 
+	var dpopJKT string
+	if h.Configuration.DPoP != nil && h.Configuration.DPoP.Enabled {
+		var err error
+		dpopJKT, err = extractAuthorizeDPoPJKT(r)
+		if err != nil {
+			h.Log.Errorf("❌ [PROXY-AUTH] Invalid DPoP binding: %v", err)
+			http.Error(w, "Invalid DPoP proof", http.StatusBadRequest)
+			return
+		}
+	}
+
 	proxyState := utils.GenerateState()
 	proxyNonce := utils.GenerateNonce()
 	proxyCodeChallenge := originalCodeChallenge
@@ -546,6 +569,7 @@ func (h *AuthorizeHandler) handleProxyAuthorize(w http.ResponseWriter, r *http.R
 		ProxyNonce:            proxyNonce,
 		ProxyCodeChallenge:    proxyCodeChallenge,
 		ClientID:              clientID,
+		DPoPJKT:               dpopJKT,
 	}
 	h.Log.Printf("✅ [PROXY-AUTH] Session data stored")
 
@@ -878,6 +902,18 @@ func (h *AuthorizeHandler) handlePushedAuthorizeRequest(w http.ResponseWriter, r
 	for key, values := range r.Form {
 		if len(values) > 0 {
 			parameters[key] = values[0]
+		}
+	}
+
+	// RFC 9449 §10.1: DPoP on PAR binds the authorization to the proof key
+	if h.Configuration.DPoP != nil && h.Configuration.DPoP.Enabled {
+		if jkt, err := extractAuthorizeDPoPJKT(r); err != nil {
+			h.Log.Errorf("❌ [PUSHED-AUTHORIZE-REQUEST-HANDLER] Invalid DPoP binding: %v", err)
+			http.Error(w, "Invalid DPoP proof", http.StatusBadRequest)
+			return
+		} else if jkt != "" {
+			parameters["dpop_jkt"] = jkt
+			h.Log.Printf("✅ [PUSHED-AUTHORIZE-REQUEST-HANDLER] Bound PAR to dpop_jkt: %s", jkt)
 		}
 	}
 

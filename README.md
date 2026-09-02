@@ -59,6 +59,18 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 - **Privileged Client Audience Inclusion**: Attestation-enabled clients automatically get privileged clients added to their audience for token introspection access
 - **Standards Compliance**: Follows draft-ietf-oauth-attestation-based-client-auth-07
 
+### 🔑 DPoP — Demonstrating Proof of Possession (RFC 9449)
+- **Sender-constrained tokens**: Bind access tokens to a client-held key via DPoP proofs
+- **Opt-in**: Enable with `DPOP_ENABLED=true` (existing Bearer clients keep working)
+- **Optional require mode**: `DPOP_REQUIRED=true` rejects token requests without a DPoP proof
+- **Optional nonce mode**: `DPOP_NONCE_REQUIRED=true` challenges proofs with `use_dpop_nonce` / `DPoP-Nonce` (RFC 9449 §8)
+- **Auth-code / PAR binding**: `dpop_jkt` or a DPoP proof at `/authorize` or PAR binds the code to a key (RFC 9449 §10)
+- **Proxy mint paths**: Authorization-code, refresh, device-code, and token-exchange proxy issuance honor DPoP the same way as local `/token`
+- **Token response**: `token_type=DPoP` and `cnf.jkt` (JWK thumbprint)
+- **Introspection**: Returns `cnf.jkt` for DPoP-bound tokens
+- **Protected resources**: `/userinfo` requires `Authorization: DPoP` + matching proof (`ath`) for bound tokens
+- **Discovery**: Advertises `dpop_signing_alg_values_supported` (and `dpop_nonce_required` when nonce mode is on)
+
 ### 🛡️ Trust Anchor Management
 - **Dynamic Certificate Upload**: Upload X.509 trust anchor certificates via API
 - **Certificate Validation**: Automatic PEM format and X.509 validation
@@ -81,6 +93,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 - ✅ **RFC 9126** - OAuth 2.0 Pushed Authorization Requests
 - ✅ **RFC 7591** - Dynamic Client Registration
 - ✅ **RFC 8414** - Authorization Server Metadata
+- ✅ **RFC 9449** - OAuth 2.0 Demonstrating Proof of Possession (DPoP)
 - ✅ **OpenID Connect Core 1.0**
 - ✅ **draft-ietf-oauth-attestation-based-client-auth-07** - OAuth 2.0 Attestation-Based Client Authentication
 - ✅ **OpenID 4 Verifiable Credential Issuance 1.0** - `issuer_state` parameter support
@@ -88,6 +101,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 ### Extensions
 - 🛡️ **Trust Anchor Management API** - Dynamic certificate management for attestation validation
 - 🔐 **Privileged Client Audience Inclusion** - Automatic audience management for attestation-enabled clients enabling privileged client token introspection
+- 🔑 **DPoP** - Opt-in sender-constrained access tokens (`DPOP_ENABLED`)
 
 ### Production Features
 - ✅ Kubernetes native
@@ -111,6 +125,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 - **helm/oauth2-server/**: Kubernetes Helm chart for deployment.
 - **.env.example**: Environment variables template for proxy mode and server configuration.
 - **tests/**: Comprehensive test suite for OAuth2 flows, attestation features, and privileged client functionality
+  - `test_dpop.sh`: RFC 9449 DPoP binding, nonce challenge, discovery, introspection, and Bearer rejection for bound tokens
   - `test_attestation_privileged_audience.sh`: Validates privileged client audience inclusion for attestation-enabled clients
   - `test_introspection_jwt_client_assertion.sh`: Validates JWT client assertion authentication for token introspection
   - `test_refresh_token_basic.sh`: Basic refresh token functionality testing
@@ -223,6 +238,8 @@ $ make test
 🔨 Building OAuth2 server...
 go build -ldflags "-s -w" -o bin/oauth2-server cmd/server/main.go
 ✅ Build completed: bin/oauth2-server
+🔍 Checking if port 8080 is available...
+✅ Port 8080 is available.
 🧪 Starting automated test suite with test isolation...
 Testing test_attestation_auth.sh                 ... ✅ PASSED
 Testing test_attestation_integration.sh          ... ✅ PASSED
@@ -234,6 +251,7 @@ Testing test_cimd_registration.sh                ... ✅ PASSED
 Testing test_client_registration.sh              ... ✅ PASSED
 Testing test_complete_flow.sh                    ... ✅ PASSED
 Testing test_device_flow.sh                      ... ✅ PASSED
+Testing test_dpop.sh                             ... ✅ PASSED
 Testing test_introspection.sh                    ... ✅ PASSED
 Testing test_introspection_jwt_client_assertion.sh ... ✅ PASSED
 Testing test_oauth2_flow.sh                      ... ✅ PASSED
@@ -259,7 +277,7 @@ Testing test_userinfo.sh                         ... ✅ PASSED
 Testing test_validation.sh                       ... ✅ PASSED
 
 ════════════════════════════════════════════════════════════════
-📊 Test Summary: 33 passed, 0 failed
+📊 Test Summary: 34 passed, 0 failed
 ════════════════════════════════════════════════════════════════
 ✅ All tests passed!
 ```
@@ -426,6 +444,10 @@ UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_CREDENTIAL_CONFIGURATION_ID=edu
 | `AUTHORIZATION_CODE_EXPIRY_SECONDS` | int | 600 | Authorization code lifetime in seconds |
 | `REQUIRE_HTTPS` | bool | false | Require HTTPS for all OAuth2 endpoints |
 | `ENABLE_PKCE` | bool | true | Enable PKCE (Proof Key for Code Exchange) support |
+| `DPOP_ENABLED` | bool | false | Enable RFC 9449 DPoP (clients may request sender-constrained tokens) |
+| `DPOP_REQUIRED` | bool | false | Require a DPoP proof on all token requests when DPoP is enabled |
+| `DPOP_NONCE_REQUIRED` | bool | false | Require server-issued nonce in DPoP proofs (`use_dpop_nonce`) |
+| `DPOP_MAX_CLOCK_SKEW_SECONDS` | int | 120 | Allowed clock skew for DPoP proof `iat` validation |
 | `ALLOW_SYNTHETIC_ID_TOKEN` | bool | false | If upstream omits `id_token`, allow proxy to mint one (use with caution) |
 | `REQUIRE_PROXY_CONSENT` | bool | false | In proxy mode, always show a local consent screen after upstream callback and before redirecting downstream |
 | `API_KEY` | string | - | API key for protected endpoints (registration, trust anchor management) |
