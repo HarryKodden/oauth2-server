@@ -175,6 +175,9 @@ else
     if [ "$(basename "$SCRIPT")" = "test_cimd_registration.sh" ] || [ "$(basename "$SCRIPT")" = "test_cimd_example.sh" ]; then
         log "🔧 Enabling CIMD for test script"
         DATABASE_TYPE="$TEST_DATABASE_TYPE" UPSTREAM_PROVIDER_URL="" CIMD_ENABLED=true CIMD_HTTP_PERMITTED=true ENABLE_TRUST_ANCHOR_API=true ENABLE_REGISTRATION_API=true API_KEY="$API_KEY" ./bin/oauth2-server > server-test.log 2>&1 &
+    elif [ "$(basename "$SCRIPT")" = "test_dpop.sh" ]; then
+        log "🔧 Enabling DPoP (RFC 9449) for test script"
+        DATABASE_TYPE="$TEST_DATABASE_TYPE" UPSTREAM_PROVIDER_URL="" DPOP_ENABLED=true DPOP_NONCE_REQUIRED=true ENABLE_TRUST_ANCHOR_API=true API_KEY="$API_KEY" ./bin/oauth2-server > server-test.log 2>&1 &
     else
         DATABASE_TYPE="$TEST_DATABASE_TYPE" UPSTREAM_PROVIDER_URL="" ENABLE_TRUST_ANCHOR_API=true API_KEY="$API_KEY" ./bin/oauth2-server > server-test.log 2>&1 &
     fi

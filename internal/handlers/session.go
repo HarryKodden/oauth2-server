@@ -18,6 +18,7 @@ type UpstreamSessionData struct {
 	ProxyNonce            string
 	ProxyCodeChallenge    string
 	ClientID              string // Client ID for consent checking
+	DPoPJKT               string // RFC 9449 authorization-time DPoP key thumbprint
 	// Device flow specific fields
 	UpstreamDeviceCode string
 	UpstreamUserCode   string

@@ -236,7 +236,7 @@ func (h *TokenHandler) handleProxyRefreshToken(w http.ResponseWriter, r *http.Re
 	upstreamRefreshToken, _ := upstreamTokens["refresh_token"].(string)
 	if upstreamRefreshToken == "" {
 		h.Log.Infof("ℹ️ [PROXY-REFRESH] No upstream refresh token; performing local proxy refresh without upstream call")
-		h.createProxyTokensForRefresh(w, r, upstreamTokens, clientID, fositeClient)
+		h.createProxyTokensForRefresh(w, r, upstreamTokens, clientID, fositeClient, refreshSession.GetSession())
 		return
 	}
 
@@ -312,7 +312,7 @@ func (h *TokenHandler) handleProxyRefreshToken(w http.ResponseWriter, r *http.Re
 	h.Log.Debugf("📄 [PROXY-REFRESH] Upstream refresh response: %s", string(respBody))
 
 	// Create new proxy tokens from upstream response
-	h.createProxyTokensForRefresh(w, r, upstreamTokenResp, clientID, fositeClient)
+	h.createProxyTokensForRefresh(w, r, upstreamTokenResp, clientID, fositeClient, refreshSession.GetSession())
 }
 
 // lenValue safely returns the length of a pointer-to-map, treating nil as zero.
@@ -324,7 +324,7 @@ func lenValue(m *map[string]string) int {
 }
 
 // createProxyTokensForRefresh creates proxy tokens for refresh token flow
-func (h *TokenHandler) createProxyTokensForRefresh(w http.ResponseWriter, r *http.Request, upstreamTokenResp map[string]interface{}, clientID string, client fosite.Client) {
+func (h *TokenHandler) createProxyTokensForRefresh(w http.ResponseWriter, r *http.Request, upstreamTokenResp map[string]interface{}, clientID string, client fosite.Client, priorSession fosite.Session) {
 	ctx := r.Context()
 	// Extract upstream tokens
 	upstreamAccessToken, _ := upstreamTokenResp["access_token"].(string)
@@ -347,6 +347,11 @@ func (h *TokenHandler) createProxyTokensForRefresh(w http.ResponseWriter, r *htt
 	}
 	if proxySession.Claims.Extra == nil {
 		proxySession.Claims.Extra = make(map[string]interface{})
+	}
+
+	// Preserve prior DPoP binding across refresh so proof key must match
+	if prior := getDPoPJKTFromSession(priorSession); prior != "" {
+		_ = storeDPoPJKTInSession(proxySession, prior)
 	}
 
 	// Store upstream token mapping in session
@@ -380,6 +385,11 @@ func (h *TokenHandler) createProxyTokensForRefresh(w http.ResponseWriter, r *htt
 	accessRequest.GrantedAudience = fosite.Arguments{}
 	accessRequest.Client = client
 	accessRequest.GrantTypes = fosite.Arguments{"refresh_token"}
+
+	dpopJKT, ok := h.applyProxyDPoP(w, r, proxySession)
+	if !ok {
+		return
+	}
 
 	// Create access response using Fosite's normal flow
 	accessResponse, err := h.OAuth2Provider.NewAccessResponse(ctx, accessRequest)
@@ -488,6 +498,9 @@ func (h *TokenHandler) createProxyTokensForRefresh(w http.ResponseWriter, r *htt
 	if refreshToken != "" {
 		proxyResponse["refresh_token"] = refreshToken
 	}
+
+	applyDPoPToProxyJSON(proxyResponse, dpopJKT)
+	h.setDPoPNonceResponseHeader(w, dpopJKT)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")

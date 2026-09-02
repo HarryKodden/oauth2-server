@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"oauth2-server/internal/attestation"
 	"oauth2-server/internal/cimd"
@@ -32,6 +33,7 @@ type TokenHandler struct {
 	SecretManager               *store.SecretManager
 	AuthCodeToStateMap          *map[string]string
 	AuthCodeToNonceMap          *map[string]string // authorization_code -> original_nonce
+	AuthCodeToDPoPJKTMap        *map[string]string // authorization_code -> dpop_jkt (proxy binding)
 	DeviceCodeToUpstreamMap     *map[string]DeviceCodeMapping
 	AccessTokenToIssuerStateMap *map[string]string
 	AccessTokenStrategy         interface{} // Will be oauth2.AccessTokenStrategy
@@ -51,6 +53,7 @@ func NewTokenHandler(
 	secretManager *store.SecretManager,
 	authCodeToStateMap *map[string]string,
 	authCodeToNonceMap *map[string]string,
+	authCodeToDPoPJKTMap *map[string]string,
 	deviceCodeToUpstreamMap *map[string]DeviceCodeMapping,
 	accessTokenToIssuerStateMap *map[string]string,
 	accessTokenStrategy interface{},
@@ -67,6 +70,7 @@ func NewTokenHandler(
 		SecretManager:               secretManager,
 		AuthCodeToStateMap:          authCodeToStateMap,
 		AuthCodeToNonceMap:          authCodeToNonceMap,
+		AuthCodeToDPoPJKTMap:        authCodeToDPoPJKTMap,
 		DeviceCodeToUpstreamMap:     deviceCodeToUpstreamMap,
 		AccessTokenToIssuerStateMap: accessTokenToIssuerStateMap,
 		AccessTokenStrategy:         accessTokenStrategy,
@@ -409,6 +413,22 @@ func (h *TokenHandler) HandleTokenRequest(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// RFC 9449 DPoP: validate proof (if present/required) and bind jkt to session before minting tokens
+	boundJKT := h.lookupBoundDPoPJKT(r, accessRequest.GetSession())
+	dpopJKT, dpopErr := h.processDPoPForTokenRequest(r, accessRequest.GetSession(), boundJKT)
+	if dpopErr != nil {
+		if errors.Is(dpopErr, errUseDPoPNonce) {
+			writeUseDPoPNonce(w, h.getDPoPVerifier())
+			return
+		}
+		h.Log.Errorf("❌ DPoP processing failed: %v", dpopErr)
+		if h.Metrics != nil {
+			h.Metrics.RecordTokenRequest(grantType, clientID, "error")
+		}
+		h.OAuth2Provider.WriteAccessError(ctx, w, accessRequest, dpopErr)
+		return
+	}
+
 	// Let fosite create the access response
 	accessResponse, err := h.OAuth2Provider.NewAccessResponse(ctx, accessRequest)
 	if err != nil {
@@ -423,6 +443,12 @@ func (h *TokenHandler) HandleTokenRequest(w http.ResponseWriter, r *http.Request
 		}
 		h.OAuth2Provider.WriteAccessError(ctx, w, accessRequest, err)
 		return
+	}
+
+	applyDPoPToAccessResponse(accessResponse, dpopJKT)
+	if dpopJKT != "" {
+		// Offer a fresh nonce for subsequent proofs (RFC 9449 §8.2)
+		w.Header().Set("DPoP-Nonce", h.getDPoPVerifier().Nonces.Issue())
 	}
 
 	// Let fosite write the response

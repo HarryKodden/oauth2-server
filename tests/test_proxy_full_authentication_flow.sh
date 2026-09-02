@@ -16,7 +16,8 @@ OAUTH2_SERVER_URL="${OAUTH2_SERVER_URL:-http://localhost:8080}"
 MOCK_PROVIDER_URL="http://localhost:9999"
 TEST_CLIENT_ID="test-client-$(date +%s)"
 TEST_CLIENT_SECRET="test-secret-$(date +%s)"
-TEST_REDIRECT_URI="http://localhost:8081/callback"
+# Use an unused high port: 8081 is often an SSH tunnel (e.g. MidPoint) on developer machines.
+TEST_REDIRECT_URI="http://127.0.0.1:34567/callback"
 TEST_USERNAME="john.doe"
 TEST_PASSWORD="password123"
 TEST_SCOPE="openid profile email"
@@ -156,7 +157,7 @@ if echo "$AUTH_RESPONSE" | grep -Eq "HTTP_CODE:(302|303)"; then
     echo "🔄 Step 4b: Following authorization redirect chain..."
     AUTH_REDIRECT_OUTPUT=$(timeout 15 curl -s -L --connect-timeout 3 --max-time 5 \
       -w "FINAL_URL:%{url_effective}\nHTTP_CODE:%{http_code}\nREDIRECT_COUNT:%{num_redirects}\n" \
-      "$AUTH_URL" 2>/dev/null || echo "TIMEOUT_OR_ERROR")
+      "$AUTH_URL" 2>/dev/null || true)
 else
     echo "❌ Expected redirect (302 or 303) but got: $(echo "$AUTH_RESPONSE" | grep "HTTP_CODE:" | sed 's/HTTP_CODE://')"
     exit 1

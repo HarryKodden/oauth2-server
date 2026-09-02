@@ -14,25 +14,27 @@ import (
 
 // CallbackHandler manages OAuth2 callback requests for both proxy and local modes
 type CallbackHandler struct {
-	Configuration      *config.Config
-	Log                *logrus.Logger
-	UpstreamSessionMap *map[string]UpstreamSessionData
-	AuthCodeToStateMap *map[string]string
-	AuthCodeToNonceMap *map[string]string // maps code->original nonce
-	ClaimsHandler      *ClaimsHandler
-	Storage            store.Storage
+	Configuration        *config.Config
+	Log                  *logrus.Logger
+	UpstreamSessionMap   *map[string]UpstreamSessionData
+	AuthCodeToStateMap   *map[string]string
+	AuthCodeToNonceMap   *map[string]string // maps code->original nonce
+	AuthCodeToDPoPJKTMap *map[string]string // maps code->dpop_jkt (RFC 9449 §10 proxy binding)
+	ClaimsHandler        *ClaimsHandler
+	Storage              store.Storage
 }
 
 // NewCallbackHandler creates a new callback handler
-func NewCallbackHandler(configuration *config.Config, log *logrus.Logger, upstreamSessionMap *map[string]UpstreamSessionData, authCodeToStateMap *map[string]string, authCodeToNonceMap *map[string]string, claimsHandler *ClaimsHandler, storage store.Storage) *CallbackHandler {
+func NewCallbackHandler(configuration *config.Config, log *logrus.Logger, upstreamSessionMap *map[string]UpstreamSessionData, authCodeToStateMap *map[string]string, authCodeToNonceMap *map[string]string, authCodeToDPoPJKTMap *map[string]string, claimsHandler *ClaimsHandler, storage store.Storage) *CallbackHandler {
 	return &CallbackHandler{
-		Configuration:      configuration,
-		Log:                log,
-		UpstreamSessionMap: upstreamSessionMap,
-		AuthCodeToStateMap: authCodeToStateMap,
-		AuthCodeToNonceMap: authCodeToNonceMap,
-		ClaimsHandler:      claimsHandler,
-		Storage:            storage,
+		Configuration:        configuration,
+		Log:                  log,
+		UpstreamSessionMap:   upstreamSessionMap,
+		AuthCodeToStateMap:   authCodeToStateMap,
+		AuthCodeToNonceMap:   authCodeToNonceMap,
+		AuthCodeToDPoPJKTMap: authCodeToDPoPJKTMap,
+		ClaimsHandler:        claimsHandler,
+		Storage:              storage,
 	}
 }
 
@@ -119,6 +121,12 @@ func (h *CallbackHandler) handleProxyCallback(w http.ResponseWriter, r *http.Req
 
 // completeProxyAuthorization completes the proxy authorization by redirecting to the client
 func (h *CallbackHandler) completeProxyAuthorization(w http.ResponseWriter, r *http.Request, sess UpstreamSessionData, code string) {
+	// Persist DPoP authorization binding for the token endpoint (RFC 9449 §10)
+	if sess.DPoPJKT != "" && h.AuthCodeToDPoPJKTMap != nil && code != "" {
+		(*h.AuthCodeToDPoPJKTMap)[code] = sess.DPoPJKT
+		h.Log.Printf("✅ [PROXY-CALLBACK] Bound auth code to dpop_jkt: %s", sess.DPoPJKT)
+	}
+
 	// Build redirect to original client redirect URI
 	redirect := sess.OriginalRedirectURI
 	// Preserve original state

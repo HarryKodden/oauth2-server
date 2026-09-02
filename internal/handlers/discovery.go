@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"oauth2-server/internal/dpop"
 	"oauth2-server/pkg/config"
 )
 
@@ -174,6 +175,14 @@ func (h *DiscoveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 		"op_policy_uri": baseURL + "/policy",
 		"op_tos_uri":    baseURL + "/terms",
+	}
+
+	if h.Configuration.DPoP != nil && h.Configuration.DPoP.Enabled {
+		wellKnown["dpop_signing_alg_values_supported"] = dpop.SupportedAlgs
+		// Advertise that the AS may require/issue DPoP nonces (RFC 9449 §8)
+		if h.Configuration.DPoP.NonceRequired {
+			wellKnown["dpop_nonce_required"] = true
+		}
 	}
 
 	// Advertise CIMD support if enabled

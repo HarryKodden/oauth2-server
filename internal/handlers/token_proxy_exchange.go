@@ -357,6 +357,11 @@ func (h *TokenHandler) createProxyTokensForTokenExchange(w http.ResponseWriter, 
 	}
 	accessRequest.GrantTypes = fositeGrantTypes
 
+	dpopJKT, ok := h.applyProxyDPoP(w, r, proxySession)
+	if !ok {
+		return
+	}
+
 	// Create access response using Fosite's normal flow
 	accessResponse, err := h.OAuth2Provider.NewAccessResponse(ctx, accessRequest)
 	if err != nil && issueRefreshToken {
@@ -570,6 +575,9 @@ func (h *TokenHandler) createProxyTokensForTokenExchange(w http.ResponseWriter, 
 			proxyResponse["id_token"] = idToken
 		}
 	}
+
+	applyDPoPToProxyJSON(proxyResponse, dpopJKT)
+	h.setDPoPNonceResponseHeader(w, dpopJKT)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")

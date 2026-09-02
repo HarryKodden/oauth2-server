@@ -203,6 +203,11 @@ func (h *TokenHandler) createProxyTokensForDeviceCode(w http.ResponseWriter, r *
 	accessRequest.Client = client
 	accessRequest.GrantTypes = fosite.Arguments{"client_credentials"}
 
+	dpopJKT, ok := h.applyProxyDPoP(w, r, proxySession)
+	if !ok {
+		return
+	}
+
 	// Create access response using Fosite's normal flow
 	accessResponse, err := h.OAuth2Provider.NewAccessResponse(ctx, accessRequest)
 	if err != nil {
@@ -347,6 +352,9 @@ func (h *TokenHandler) createProxyTokensForDeviceCode(w http.ResponseWriter, r *
 	if idToken != "" {
 		proxyResponse["id_token"] = idToken
 	}
+
+	applyDPoPToProxyJSON(proxyResponse, dpopJKT)
+	h.setDPoPNonceResponseHeader(w, dpopJKT)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")

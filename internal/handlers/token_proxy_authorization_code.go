@@ -234,6 +234,11 @@ func (h *TokenHandler) handleProxyAuthorizationCode(w http.ResponseWriter, r *ht
 	h.Log.Debugf("🔍 [PROXY-AUTH-CODE] Manually created access request - Client: %s, GrantTypes: %v, GrantedScopes: %v",
 		accessRequest.GetClient().GetID(), accessRequest.GetGrantTypes(), accessRequest.GetGrantedScopes())
 
+	dpopJKT, ok := h.applyProxyDPoP(w, r, proxySession)
+	if !ok {
+		return
+	}
+
 	// Create access response using Fosite's normal flow
 	h.Log.Debugf("🔍 [PROXY-AUTH-CODE] About to call NewAccessResponse")
 	accessResponse, err := h.OAuth2Provider.NewAccessResponse(ctx, accessRequest)
@@ -284,6 +289,9 @@ func (h *TokenHandler) handleProxyAuthorizationCode(w http.ResponseWriter, r *ht
 		accessResponse = &fosite.AccessResponse{}
 		accessResponse.SetAccessToken(accessToken)
 		accessResponse.SetTokenType("Bearer")
+		if dpopJKT != "" {
+			applyDPoPToAccessResponse(accessResponse, dpopJKT)
+		}
 		if refreshToken != "" {
 			accessResponse.SetExtra("refresh_token", refreshToken)
 		}
@@ -429,6 +437,9 @@ func (h *TokenHandler) handleProxyAuthorizationCode(w http.ResponseWriter, r *ht
 	if idToken != "" {
 		proxyResponse["id_token"] = idToken
 	}
+
+	applyDPoPToProxyJSON(proxyResponse, dpopJKT)
+	h.setDPoPNonceResponseHeader(w, dpopJKT)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
