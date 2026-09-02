@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Avoid "Terminated: 15" noise when cleaning up background jobs on macOS/bash.
+set +m
+
 SCRIPT="$1"
 TEST_DATABASE_TYPE="${2:-memory}"
 OAUTH2_SERVER_URL="${3:-http://localhost:8080}"
@@ -13,6 +16,35 @@ QUIET="${8:-}"
 log() {
     if [ -z "$QUIET" ]; then
         echo "$@"
+    fi
+}
+
+# Normalize script name so both "test_foo.sh" and "tests/test_foo.sh" work.
+SCRIPT="$(basename "$SCRIPT")"
+
+# Extract listen port from OAUTH2_SERVER_URL (default 8080)
+SERVER_PORT="$(printf '%s' "$OAUTH2_SERVER_URL" | sed -n 's|.*:\([0-9][0-9]*\).*|\1|p')"
+SERVER_PORT="${SERVER_PORT:-8080}"
+
+kill_port() {
+    local port="$1"
+    if lsof -i ":$port" >/dev/null 2>&1; then
+        log "⚠️  Port $port is already in use. Killing existing process..."
+        lsof -ti ":$port" | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+stop_bg() {
+    local pidfile="$1"
+    if [ -f "$pidfile" ]; then
+        local pid
+        pid="$(cat "$pidfile" 2>/dev/null || true)"
+        if [ -n "$pid" ]; then
+            kill "$pid" 2>/dev/null || true
+            wait "$pid" 2>/dev/null || true
+        fi
+        rm -f "$pidfile"
     fi
 }
 
@@ -30,11 +62,8 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
     
     # Start mock provider
     log "🚀 Starting mock upstream provider..."
-    if lsof -i :9999 >/dev/null 2>&1; then
-        log "⚠️  Port 9999 is already in use. Killing existing process..."
-        lsof -ti :9999 | xargs kill -9 2>/dev/null || true
-        sleep 2
-    fi
+    kill_port 9999
+    kill_port "$SERVER_PORT"
     
     if [ ! -f "mock_provider.py" ]; then
         echo "❌ mock_provider.py not found"
@@ -59,7 +88,8 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
             if [ $i -eq 5 ]; then
                 echo "❌ Mock provider failed to start after 5 attempts"
                 cat mock_provider.log
-                if [ -f mock_provider.pid ]; then kill $(cat mock_provider.pid) 2>/dev/null || true; rm -f mock_provider.pid mock_provider_test.py; fi
+                stop_bg mock_provider.pid
+                rm -f mock_provider_test.py
                 exit 1
             fi
         fi
@@ -68,7 +98,7 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
     # Some proxy tests manage their own OAuth2 server lifecycle.
     # In those cases we only prepare the mock provider here.
     PROXY_TEST_MANAGES_SERVER=""
-    if [ "$(basename "$SCRIPT")" = "test_proxy_public_client_flow.sh" ]; then
+    if [ "$SCRIPT" = "test_proxy_public_client_flow.sh" ]; then
         PROXY_TEST_MANAGES_SERVER="yes"
         log "ℹ️  $SCRIPT manages its own OAuth2 server lifecycle; skipping wrapper server startup"
     fi
@@ -83,6 +113,14 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
         EXTRA_UPSTREAM_PROMPT_POLICY_ENV="yes"
         log "🔧 Enabling upstream prompt policies for this test..."
     fi
+
+    DPOP_PROXY_ENV=""
+    case "$SCRIPT" in
+        test_proxy_dpop_authorization_code.sh|test_proxy_dpop_refresh.sh|test_proxy_dpop_par.sh)
+            DPOP_PROXY_ENV="yes"
+            log "🔧 Enabling DPOP_ENABLED + DPOP_REQUIRED for $SCRIPT..."
+            ;;
+    esac
 
     if [ -z "$PROXY_TEST_MANAGES_SERVER" ]; then
         if [ -n "$EXTRA_UPSTREAM_PROMPT_POLICY_ENV" ]; then
@@ -100,6 +138,16 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
                 UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_PROMPT="login" \
                 UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_AUTHZ_DETAILS_TYPE="openid_credential" \
                 UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_CREDENTIAL_CONFIGURATION_ID="eduID" \
+                ./bin/oauth2-server > server-test.log 2>&1 &
+        elif [ -n "$DPOP_PROXY_ENV" ]; then
+            DATABASE_TYPE="$TEST_DATABASE_TYPE" \
+                UPSTREAM_PROVIDER_URL="http://localhost:9999" \
+                UPSTREAM_CLIENT_ID="upstream_client" \
+                UPSTREAM_CLIENT_SECRET="upstream_secret" \
+                ENABLE_TRUST_ANCHOR_API=true \
+                API_KEY="$API_KEY" \
+                DPOP_ENABLED=true \
+                DPOP_REQUIRED=true \
                 ./bin/oauth2-server > server-test.log 2>&1 &
         else
             DATABASE_TYPE="$TEST_DATABASE_TYPE" \
@@ -126,8 +174,9 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
                 if [ $i -eq 5 ]; then
                     echo "❌ Server failed to start after 5 attempts"
                     cat server-test.log
-                    if [ -f server.pid ]; then kill $(cat server.pid) 2>/dev/null || true; rm -f server.pid; fi
-                    if [ -f mock_provider.pid ]; then kill $(cat mock_provider.pid) 2>/dev/null || true; rm -f mock_provider.pid mock_provider_test.py; fi
+                    stop_bg server.pid
+                    stop_bg mock_provider.pid
+                    rm -f mock_provider_test.py
                     exit 1
                 fi
             fi
@@ -145,37 +194,34 @@ elif echo "$SCRIPT" | grep -q "proxy"; then
     fi
     
     # Cleanup
-    if [ -f server.pid ]; then
+    if [ -z "$PROXY_TEST_MANAGES_SERVER" ]; then
         log "🛑 Stopping server..."
-        kill $(cat server.pid) 2>/dev/null || true
-        rm -f server.pid
+        stop_bg server.pid
     fi
-    
-    if [ -f mock_provider.pid ]; then
-        log "🛑 Stopping mock provider..."
-        kill $(cat mock_provider.pid) 2>/dev/null || true
-        rm -f mock_provider.pid mock_provider_test.py mock_provider.log
-    fi
+    log "🛑 Stopping mock provider..."
+    stop_bg mock_provider.pid
+    rm -f mock_provider_test.py mock_provider.log
     
     if [ -z "$QUIET" ]; then
         if [ $result -eq 0 ]; then
             echo "✅ $SCRIPT passed"
         else
             echo "❌ $SCRIPT failed"
+            echo "Server logs:"
+            cat server-test.log 2>/dev/null || true
         fi
-        echo "Server logs:"
-        cat server-test.log 2>/dev/null || true
     fi
     
     rm -f server-test.log
     exit $result
 else
     log "🚀 Starting OAuth2 server in background..."
+    kill_port "$SERVER_PORT"
     # If running the CIMD integration tests, enable CIMD and permit HTTP for local mock metadata
-    if [ "$(basename "$SCRIPT")" = "test_cimd_registration.sh" ] || [ "$(basename "$SCRIPT")" = "test_cimd_example.sh" ]; then
+    if [ "$SCRIPT" = "test_cimd_registration.sh" ] || [ "$SCRIPT" = "test_cimd_example.sh" ]; then
         log "🔧 Enabling CIMD for test script"
         DATABASE_TYPE="$TEST_DATABASE_TYPE" UPSTREAM_PROVIDER_URL="" CIMD_ENABLED=true CIMD_HTTP_PERMITTED=true ENABLE_TRUST_ANCHOR_API=true ENABLE_REGISTRATION_API=true API_KEY="$API_KEY" ./bin/oauth2-server > server-test.log 2>&1 &
-    elif [ "$(basename "$SCRIPT")" = "test_dpop.sh" ]; then
+    elif [ "$SCRIPT" = "test_dpop.sh" ]; then
         log "🔧 Enabling DPoP (RFC 9449) for test script"
         DATABASE_TYPE="$TEST_DATABASE_TYPE" UPSTREAM_PROVIDER_URL="" DPOP_ENABLED=true DPOP_NONCE_REQUIRED=true ENABLE_TRUST_ANCHOR_API=true API_KEY="$API_KEY" ./bin/oauth2-server > server-test.log 2>&1 &
     else
@@ -197,7 +243,7 @@ else
             if [ $i -eq 5 ]; then
                 echo "❌ Server failed to start after 5 attempts"
                 cat server-test.log
-                if [ -f server.pid ]; then kill $(cat server.pid) 2>/dev/null || true; rm -f server.pid; fi
+                stop_bg server.pid
                 exit 1
             fi
         fi
@@ -223,20 +269,17 @@ else
         result=$?
     fi
 
-    if [ -f server.pid ]; then
-        log "🛑 Stopping server..."
-        kill $(cat server.pid) 2>/dev/null || true
-        rm -f server.pid
-    fi
+    log "🛑 Stopping server..."
+    stop_bg server.pid
 
     if [ -z "$QUIET" ]; then
         if [ $result -eq 0 ]; then
             echo "✅ $SCRIPT passed"
         else
             echo "❌ $SCRIPT failed"
+            echo "Server logs:"
+            cat server-test.log 2>/dev/null || true
         fi
-        echo "Server logs:"
-        cat server-test.log 2>/dev/null || true
     fi
     
     rm -f server-test.log

@@ -211,7 +211,7 @@ func (h *UserInfoHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *UserInfoHandler) handleProxyUserinfo(w http.ResponseWriter, r *http.Request) {
 	h.Log.Printf("🔄 [PROXY] Starting upstream userinfo request")
 
-	// Extract the proxy access token from Authorization header
+	// Extract the proxy access token from Authorization header (Bearer or DPoP)
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		h.Log.Errorf("❌ [PROXY] Missing authorization header in userinfo request")
@@ -219,15 +219,40 @@ func (h *UserInfoHandler) handleProxyUserinfo(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
+	scheme, proxyToken, ok := extractAccessTokenFromAuth(authHeader)
+	if !ok || (!strings.EqualFold(scheme, "Bearer") && !strings.EqualFold(scheme, dpop.AuthScheme)) {
 		h.Log.Errorf("❌ [PROXY] Invalid authorization header format")
+		w.Header().Set("WWW-Authenticate", "Bearer, DPoP")
 		http.Error(w, "invalid authorization header", http.StatusUnauthorized)
 		return
 	}
+	h.Log.Printf("🔑 [PROXY] Received proxy token (%s): %s...", scheme, proxyToken[:min(20, len(proxyToken))]+"...")
 
-	proxyToken := parts[1]
-	h.Log.Printf("🔑 [PROXY] Received proxy token: %s...", proxyToken[:20]+"...")
+	// RFC 9449: if this proxy token is DPoP-bound, require a matching proof before forwarding
+	if h.Configuration.DPoP != nil && h.Configuration.DPoP.Enabled {
+		_, requester, err := h.OAuth2Provider.IntrospectToken(r.Context(), proxyToken, fosite.AccessToken, &openid.DefaultSession{})
+		if err == nil && requester != nil {
+			baseURL := h.Configuration.GetEffectiveBaseURL(r)
+			skew := h.Configuration.DPoP.MaxClockSkewSeconds
+			nonceRequired := h.Configuration.DPoP.NonceRequired
+			if err := requireDPoPForBoundToken(r, baseURL, sharedDPoPVerifier(skew, nonceRequired), requester.GetSession(), scheme, proxyToken); err != nil {
+				h.Log.Errorf("❌ [PROXY] UserInfo DPoP validation failed: %v", err)
+				w.Header().Set("WWW-Authenticate", `DPoP error="invalid_dpop_proof", error_description="DPoP proof is required or invalid for this token."`)
+				http.Error(w, "Invalid DPoP proof", http.StatusUnauthorized)
+				return
+			}
+		} else if strings.EqualFold(scheme, dpop.AuthScheme) {
+			// DPoP scheme on a token we cannot introspect as bound — reject
+			h.Log.Errorf("❌ [PROXY] DPoP scheme used but token introspection failed: %v", err)
+			w.Header().Set("WWW-Authenticate", "Bearer, DPoP")
+			http.Error(w, "Invalid DPoP proof", http.StatusUnauthorized)
+			return
+		}
+	} else if strings.EqualFold(scheme, dpop.AuthScheme) {
+		w.Header().Set("WWW-Authenticate", "Bearer")
+		http.Error(w, "DPoP is not enabled on this server", http.StatusUnauthorized)
+		return
+	}
 
 	// Check if this is a proxy token by looking up upstream token mapping
 	var upstreamToken string

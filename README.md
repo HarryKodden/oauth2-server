@@ -126,6 +126,9 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 - **.env.example**: Environment variables template for proxy mode and server configuration.
 - **tests/**: Comprehensive test suite for OAuth2 flows, attestation features, and privileged client functionality
   - `test_dpop.sh`: RFC 9449 DPoP binding, nonce challenge, discovery, introspection, and Bearer rejection for bound tokens
+  - `test_proxy_dpop_authorization_code.sh`: Proxy authorization_code flow with `DPOP_REQUIRED=true` (reject without proof, bind via `dpop_jkt`, UserInfo with DPoP)
+  - `test_proxy_dpop_refresh.sh`: Proxy refresh_token preserves DPoP binding (`DPOP_REQUIRED=true`)
+  - `test_proxy_dpop_par.sh`: Proxy PAR carries `dpop_jkt` through `request_uri` to token binding
   - `test_attestation_privileged_audience.sh`: Validates privileged client audience inclusion for attestation-enabled clients
   - `test_introspection_jwt_client_assertion.sh`: Validates JWT client assertion authentication for token introspection
   - `test_refresh_token_basic.sh`: Basic refresh token functionality testing
@@ -259,6 +262,9 @@ Testing test_privileged_introspection.sh         ... ✅ PASSED
 Testing test_proxy_attestation_client.sh         ... ✅ PASSED
 Testing test_proxy_authorization_introspection.sh ... ✅ PASSED
 Testing test_proxy_device_flow.sh                ... ✅ PASSED
+Testing test_proxy_dpop_authorization_code.sh    ... ✅ PASSED
+Testing test_proxy_dpop_par.sh                   ... ✅ PASSED
+Testing test_proxy_dpop_refresh.sh               ... ✅ PASSED
 Testing test_proxy_force_consent.sh              ... ✅ PASSED
 Testing test_proxy_full_authentication_flow.sh   ... ✅ PASSED
 Testing test_proxy_public_client_flow.sh         ... ✅ PASSED
@@ -277,7 +283,7 @@ Testing test_userinfo.sh                         ... ✅ PASSED
 Testing test_validation.sh                       ... ✅ PASSED
 
 ════════════════════════════════════════════════════════════════
-📊 Test Summary: 34 passed, 0 failed
+📊 Test Summary: 37 passed, 0 failed
 ════════════════════════════════════════════════════════════════
 ✅ All tests passed!
 ```
