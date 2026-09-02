@@ -66,6 +66,59 @@ class MockOAuth2Handler(BaseHTTPRequestHandler):
             "error_description": description
         }, status)
 
+    @staticmethod
+    def _discovery_document():
+        """Shared OIDC / OAuth AS metadata for upstream discovery."""
+        return {
+            "issuer": ISSUER,
+            "authorization_endpoint": f"{ISSUER}/authorize",
+            "token_endpoint": f"{ISSUER}/token",
+            "userinfo_endpoint": f"{ISSUER}/userinfo",
+            "jwks_uri": f"{ISSUER}/.well-known/jwks.json",
+            "introspection_endpoint": f"{ISSUER}/introspect",
+            "revocation_endpoint": f"{ISSUER}/revoke",
+            "device_authorization_endpoint": f"{ISSUER}/device",
+            "scopes_supported": ["openid", "profile", "email", "offline_access"],
+            "response_types_supported": [
+                "code",
+                "token",
+                "id_token",
+                "code token",
+                "code id_token",
+                "token id_token",
+                "code token id_token",
+            ],
+            "grant_types_supported": [
+                "authorization_code",
+                "implicit",
+                "refresh_token",
+                "client_credentials",
+                "password",
+                "urn:ietf:params:oauth:grant-type:device_code",
+                "urn:ietf:params:oauth:grant-type:token-exchange",
+            ],
+            "subject_types_supported": ["public"],
+            "id_token_signing_alg_values_supported": ["RS256"],
+            "token_endpoint_auth_methods_supported": [
+                "client_secret_basic",
+                "client_secret_post",
+            ],
+            "claims_supported": [
+                "sub",
+                "iss",
+                "aud",
+                "exp",
+                "iat",
+                "email",
+                "email_verified",
+                "name",
+                "given_name",
+                "family_name",
+                "preferred_username",
+            ],
+            "code_challenge_methods_supported": ["plain", "S256"],
+        }
+
     def do_OPTIONS(self):
         self._set_headers()
 
@@ -78,29 +131,15 @@ class MockOAuth2Handler(BaseHTTPRequestHandler):
             self._json_response({"status": "ok", "service": "mock-oauth2-provider"})
             return
 
-        # Discovery endpoints
-        if path == '/.well-known/openid-configuration':
-            self._json_response({
-                "issuer": ISSUER,
-                "authorization_endpoint": f"{ISSUER}/authorize",
-                "token_endpoint": f"{ISSUER}/token",
-                "userinfo_endpoint": f"{ISSUER}/userinfo",
-                "jwks_uri": f"{ISSUER}/jwks",
-                "introspection_endpoint": f"{ISSUER}/introspect",
-                "revocation_endpoint": f"{ISSUER}/revoke",
-                "device_authorization_endpoint": f"{ISSUER}/device",
-                "scopes_supported": ["openid", "profile", "email", "offline_access"],
-                "response_types_supported": ["code", "token", "id_token", "code token", "code id_token", "token id_token", "code token id_token"],
-                "grant_types_supported": ["authorization_code", "implicit", "refresh_token", "client_credentials", "password", "urn:ietf:params:oauth:grant-type:device_code", "urn:ietf:params:oauth:grant-type:token-exchange"],
-                "subject_types_supported": ["public"],
-                "id_token_signing_alg_values_supported": ["RS256"],
-                "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"],
-                "claims_supported": ["sub", "iss", "aud", "exp", "iat", "email", "email_verified", "name", "given_name", "family_name", "preferred_username"],
-                "code_challenge_methods_supported": ["plain", "S256"]
-            })
+        # Discovery endpoints (OIDC + RFC 8414 OAuth Authorization Server Metadata)
+        if path in (
+            '/.well-known/openid-configuration',
+            '/.well-known/oauth-authorization-server',
+        ):
+            self._json_response(self._discovery_document())
             return
 
-        if path == '/jwks':
+        if path in ('/jwks', '/.well-known/jwks.json'):
             # Return minimal JWKS (not actually used in proxy tests)
             self._json_response({"keys": []})
             return
