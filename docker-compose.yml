@@ -1,4 +1,3 @@
-
 services:
   init-certs:
     image: alpine:latest
@@ -35,6 +34,32 @@ services:
       timeout: 5s
       retries: 5
 
+  mock_provider:
+    image: python:3.12-alpine
+    volumes:
+      - ./mock_provider.py:/app/mock_provider.py:ro
+    working_dir: /app
+    command: ["python3", "mock_provider.py"]
+    environment:
+      # Browser hits the published port; the AS calls mock_provider on the compose network.
+      - ISSUER=http://localhost:9999
+      - INTERNAL_BASE_URL=http://mock_provider:9999
+      - PORT=9999
+    ports:
+      - "9999:9999"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python3",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9999/.well-known/openid-configuration', timeout=2)",
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+      start_period: 3s
+
   oauth2-server:
     image: oauth2-server:latest
     build: .
@@ -43,25 +68,27 @@ services:
     environment:
       - PUBLIC_BASE_URL=http://localhost:8080
       - PORT=8080
-      
+
       - LOG_LEVEL=DEBUG
       - LOG_FORMAT=text
 
-      - UPSTREAM_PROVIDER_URL=${UPSTREAM_PROVIDER_URL}
-      - UPSTREAM_CLIENT_ID=${UPSTREAM_CLIENT_ID}
-      - UPSTREAM_CLIENT_SECRET=${UPSTREAM_CLIENT_SECRET}
-      - UPSTREAM_CALLBACK_URL=${OAUTH2_SERVER_URL:-http://localhost:8080}/callback
+      - UPSTREAM_PROVIDER_URL=${UPSTREAM_PROVIDER_URL:-http://mock_provider:9999}
+      - UPSTREAM_CLIENT_ID=${UPSTREAM_CLIENT_ID:-upstream_client}
+      - UPSTREAM_CLIENT_SECRET=${UPSTREAM_CLIENT_SECRET:-upstream_secret}
+      - UPSTREAM_CALLBACK_URL=${UPSTREAM_CALLBACK_URL:-http://localhost:8080/callback}
 
       # - DATABASE_TYPE=sqlite
       # - DATABASE_PATH=/app/oauth2.db
       - DATABASE_TYPE=postgres
       - DATABASE_PATH=postgres://oauth2:oauth2password@postgres:5432/oauth2db?sslmode=disable
-      
+
       - API_KEY=${API_KEY}
       - ENABLE_REGISTRATION_API=true
       - ENABLE_TRUST_ANCHOR_API=true
     depends_on:
       postgres:
+        condition: service_healthy
+      mock_provider:
         condition: service_healthy
     volumes:
       - ./config.yaml:/app/config.yaml:ro
@@ -91,7 +118,7 @@ services:
         condition: service_completed_successfully
       oauth2-server:
         condition: service_healthy
-        
+
 volumes:
   certs:
   postgres-data:

@@ -29,3 +29,4 @@ mock.log
 mock.pid
 mock_provider.log
 TODO.md
+tests/loadtester

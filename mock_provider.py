@@ -5,6 +5,7 @@ Simulates an upstream identity provider for proxy tests
 """
 
 import json
+import os
 import time
 import base64
 import secrets
@@ -13,8 +14,12 @@ from urllib.parse import parse_qs, urlparse
 import uuid
 
 # Configuration
-PORT = 9999
-ISSUER = f"http://localhost:{PORT}"
+PORT = int(os.environ.get("PORT", "9999"))
+# Browser-facing base URL (authorize redirects). Defaults to localhost for host browsers.
+ISSUER = os.environ.get("ISSUER") or os.environ.get("MOCK_ISSUER") or f"http://localhost:{PORT}"
+# Server-to-server base URL for token/userinfo/etc. Defaults to ISSUER; in Docker
+# Compose set this to http://mock_provider:9999 while ISSUER stays http://localhost:9999.
+INTERNAL_BASE_URL = os.environ.get("INTERNAL_BASE_URL") or ISSUER
 
 # In-memory storage
 tokens = {}
@@ -72,12 +77,12 @@ class MockOAuth2Handler(BaseHTTPRequestHandler):
         return {
             "issuer": ISSUER,
             "authorization_endpoint": f"{ISSUER}/authorize",
-            "token_endpoint": f"{ISSUER}/token",
-            "userinfo_endpoint": f"{ISSUER}/userinfo",
-            "jwks_uri": f"{ISSUER}/.well-known/jwks.json",
-            "introspection_endpoint": f"{ISSUER}/introspect",
-            "revocation_endpoint": f"{ISSUER}/revoke",
-            "device_authorization_endpoint": f"{ISSUER}/device",
+            "token_endpoint": f"{INTERNAL_BASE_URL}/token",
+            "userinfo_endpoint": f"{INTERNAL_BASE_URL}/userinfo",
+            "jwks_uri": f"{INTERNAL_BASE_URL}/.well-known/jwks.json",
+            "introspection_endpoint": f"{INTERNAL_BASE_URL}/introspect",
+            "revocation_endpoint": f"{INTERNAL_BASE_URL}/revoke",
+            "device_authorization_endpoint": f"{INTERNAL_BASE_URL}/device",
             "scopes_supported": ["openid", "profile", "email", "offline_access"],
             "response_types_supported": [
                 "code",
@@ -528,9 +533,9 @@ class MockOAuth2Handler(BaseHTTPRequestHandler):
 
 
 def run_server():
-    server_address = ('', PORT)
+    server_address = ('0.0.0.0', PORT)
     httpd = HTTPServer(server_address, MockOAuth2Handler)
-    print(f'Mock OAuth2 Provider running on port {PORT}...', flush=True)
+    print(f'Mock OAuth2 Provider running on 0.0.0.0:{PORT} (issuer={ISSUER}, internal={INTERNAL_BASE_URL})...', flush=True)
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
