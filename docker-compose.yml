@@ -28,6 +28,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./scripts/docker-postgres-init.sh:/docker-entrypoint-initdb.d/02-proxy-db.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U oauth2"]
       interval: 10s
@@ -60,6 +61,7 @@ services:
       retries: 15
       start_period: 3s
 
+  # Local IdP mode — host port 8080
   oauth2-server:
     image: oauth2-server:latest
     build: .
@@ -72,15 +74,47 @@ services:
       - LOG_LEVEL=DEBUG
       - LOG_FORMAT=text
 
+      # Force local mode even if the host shell/export has an upstream URL.
+      - UPSTREAM_PROVIDER_URL=
+
+      - DATABASE_TYPE=postgres
+      - DATABASE_PATH=postgres://oauth2:oauth2password@postgres:5432/oauth2db?sslmode=disable
+
+      - API_KEY=${API_KEY}
+      - ENABLE_REGISTRATION_API=true
+      - ENABLE_TRUST_ANCHOR_API=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    healthcheck:
+      test: ["CMD", "sh", "-c", "curl -f http://localhost:8080/health | grep -q '\"status\":\"healthy\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Proxy mode — host port 8090 (container still listens on 8080)
+  oauth2-server-proxy:
+    image: oauth2-server:latest
+    build: .
+    ports:
+      - "8090:8080"
+    environment:
+      - PUBLIC_BASE_URL=http://localhost:8090
+      - PORT=8080
+
+      - LOG_LEVEL=DEBUG
+      - LOG_FORMAT=text
+
       - UPSTREAM_PROVIDER_URL=${UPSTREAM_PROVIDER_URL:-http://mock_provider:9999}
       - UPSTREAM_CLIENT_ID=${UPSTREAM_CLIENT_ID:-upstream_client}
       - UPSTREAM_CLIENT_SECRET=${UPSTREAM_CLIENT_SECRET:-upstream_secret}
-      - UPSTREAM_CALLBACK_URL=${UPSTREAM_CALLBACK_URL:-http://localhost:8080/callback}
+      - UPSTREAM_CALLBACK_URL=${UPSTREAM_CALLBACK_URL:-http://localhost:8090/callback}
 
-      # - DATABASE_TYPE=sqlite
-      # - DATABASE_PATH=/app/oauth2.db
       - DATABASE_TYPE=postgres
-      - DATABASE_PATH=postgres://oauth2:oauth2password@postgres:5432/oauth2db?sslmode=disable
+      - DATABASE_PATH=postgres://oauth2:oauth2password@postgres:5432/oauth2db_proxy?sslmode=disable
 
       - API_KEY=${API_KEY}
       - ENABLE_REGISTRATION_API=true
@@ -92,7 +126,6 @@ services:
         condition: service_healthy
     volumes:
       - ./config.yaml:/app/config.yaml:ro
-      - ./oauth2.db:/app/oauth2.db
     healthcheck:
       test: ["CMD", "sh", "-c", "curl -f http://localhost:8080/health | grep -q '\"status\":\"healthy\"'"]
       interval: 30s
