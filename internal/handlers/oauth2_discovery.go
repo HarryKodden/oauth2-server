@@ -109,10 +109,12 @@ func (h *OAuth2DiscoveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		// Token endpoint authentication methods
 		"token_endpoint_auth_methods_supported": h.getTokenEndpointAuthMethods(),
 
-		// Token endpoint signing algorithms - TAKEN FROM UPSTREAM
+		// Token endpoint signing algorithms for private_key_jwt / client_secret_jwt
 		"token_endpoint_auth_signing_alg_values_supported": []string{
-			"RS256",
-			"HS256",
+			"RS256", "RS384", "RS512",
+			"ES256", "ES384", "ES512",
+			"PS256", "PS384", "PS512",
+			"HS256", "HS384", "HS512",
 		},
 
 		// PKCE support - TAKEN FROM UPSTREAM
@@ -125,6 +127,8 @@ func (h *OAuth2DiscoveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		"introspection_endpoint_auth_methods_supported": []string{
 			"client_secret_basic",
 			"client_secret_post",
+			"private_key_jwt",
+			"client_secret_jwt",
 		},
 
 		// Revocation endpoint authentication methods

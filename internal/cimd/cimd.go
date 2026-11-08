@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"oauth2-server/internal/auth"
 	"oauth2-server/internal/store"
 	"oauth2-server/internal/store/types"
 	"oauth2-server/pkg/config"
@@ -311,11 +312,12 @@ func CreateClientFromMetadata(meta map[string]interface{}, location string, expi
 			}
 		}
 	}
+	authMethod := ""
 	if s, ok := meta["token_endpoint_auth_method"].(string); ok {
+		authMethod = s
 		if s == "none" {
 			dc.Public = true
 		}
-		// Note: token endpoint auth method may be stored in external attestation config or handled separately
 	}
 	if s, ok := meta["scope"].(string); ok {
 		dc.Scopes = strings.Split(s, " ")
@@ -328,7 +330,24 @@ func CreateClientFromMetadata(meta map[string]interface{}, location string, expi
 		}
 	}
 
-	cc := &types.CustomClient{DefaultClient: dc}
+	cc := &types.CustomClient{
+		DefaultClient:           dc,
+		TokenEndpointAuthMethod: authMethod,
+	}
+	if s, ok := meta["jwks_uri"].(string); ok {
+		cc.JSONWebKeysURI = s
+	}
+	if s, ok := meta["token_endpoint_auth_signing_alg"].(string); ok {
+		cc.TokenEndpointAuthSigningAlgorithm = s
+	}
+	if jwksRaw, ok := meta["jwks"]; ok && jwksRaw != nil {
+		raw, err := json.Marshal(jwksRaw)
+		if err == nil {
+			if set, err := auth.ParseClientJWKS(raw); err == nil {
+				cc.JSONWebKeys = set
+			}
+		}
+	}
 	cc.MetadataDocumentLocation = location
 	cc.MetadataDocumentExpiresAt = expires.Unix()
 	cc.MetadataDocumentUpdatedAt = updatedAt.Unix()

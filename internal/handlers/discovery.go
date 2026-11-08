@@ -102,9 +102,19 @@ func (h *DiscoveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"none",
 		},
 
-		// Token endpoint signing algorithms - TAKEN FROM UPSTREAM
+		// Token endpoint signing algorithms for private_key_jwt / client_secret_jwt
 		"token_endpoint_auth_signing_alg_values_supported": []string{
-			"RS256", "HS256",
+			"RS256", "RS384", "RS512",
+			"ES256", "ES384", "ES512",
+			"PS256", "PS384", "PS512",
+			"HS256", "HS384", "HS512",
+		},
+		"introspection_endpoint_auth_methods_supported": []string{
+			"client_secret_basic",
+			"client_secret_post",
+			"private_key_jwt",
+			"client_secret_jwt",
+			"none",
 		},
 
 		// PKCE support - TAKEN FROM UPSTREAM
@@ -165,12 +175,9 @@ func (h *DiscoveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"backchannel_logout_session_supported":  false,
 
 		// Additional OAuth2 features
-		"introspection_endpoint_auth_methods_supported": []string{
-			"client_secret_basic", "client_secret_post",
-		},
-
 		"revocation_endpoint_auth_methods_supported": []string{
 			"client_secret_basic", "client_secret_post",
+			"private_key_jwt", "client_secret_jwt",
 		},
 
 		"op_policy_uri": baseURL + "/policy",

@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/joho/godotenv"
 	"github.com/ory/fosite/storage"
 	"github.com/ory/fosite/token/jwt"
@@ -90,6 +91,9 @@ var (
 
 	// Attestation manager
 	attestationManager *attestation.VerifierManager
+
+	// RFC 7523 client assertion verifier
+	assertionVerifier *auth.AssertionVerifier
 
 	// Signer for JWT ID token signing (RS256)
 	jwtSigner *jwt.DefaultSigner
@@ -508,6 +512,33 @@ func initializeClients() error {
 			}
 		}
 
+		authMethod := client.TokenEndpointAuthMethod
+		if authMethod == "" {
+			if client.Public {
+				authMethod = "none"
+			} else {
+				authMethod = "client_secret_basic"
+			}
+		}
+		signingAlg := client.TokenEndpointAuthSigningAlgorithm
+		if signingAlg == "" {
+			switch authMethod {
+			case "client_secret_jwt":
+				signingAlg = "HS256"
+			case "private_key_jwt":
+				signingAlg = "RS256"
+			}
+		}
+		var jwksSet *jose.JSONWebKeySet
+		if client.Jwks != "" {
+			parsed, err := auth.ParseClientJWKS(json.RawMessage(client.Jwks))
+			if err != nil {
+				log.Printf("⚠️ Invalid jwks for client %s: %v", client.ID, err)
+			} else {
+				jwksSet = parsed
+			}
+		}
+
 		newClient := &types.CustomClient{
 			DefaultClient: &fosite.DefaultClient{
 				ID:            client.ID,
@@ -519,9 +550,13 @@ func initializeClients() error {
 				Audience:      client.Audience,
 				Public:        client.Public,
 			},
-			Claims:              client.Claims,
-			ForceAuthentication: client.ForceAuthentication,
-			ForceConsent:        client.ForceConsent,
+			Claims:                            client.Claims,
+			ForceAuthentication:               client.ForceAuthentication,
+			ForceConsent:                      client.ForceConsent,
+			JSONWebKeysURI:                    client.JwksURI,
+			JSONWebKeys:                       jwksSet,
+			TokenEndpointAuthMethod:           authMethod,
+			TokenEndpointAuthSigningAlgorithm: signingAlg,
 		}
 
 		customStorage.Clients[client.ID] = newClient
@@ -584,6 +619,8 @@ func initializeOAuth2Provider() error {
 	log.Printf("🔍   Security.TokenExpirySeconds: %d", configuration.Security.TokenExpirySeconds)
 	log.Printf("🔍   Security.JWTSecret length: %d", len(configuration.Security.JWTSecret))
 	log.Printf("🔍   Server.BaseURL: %s", configuration.PublicBaseURL)
+	tokenURL := strings.TrimRight(configuration.PublicBaseURL, "/") + "/token"
+	introspectURL := strings.TrimRight(configuration.PublicBaseURL, "/") + "/introspect"
 	config := &fosite.Config{
 		AccessTokenLifespan:   time.Duration(configuration.Security.TokenExpirySeconds) * time.Second,
 		RefreshTokenLifespan:  time.Duration(configuration.Security.RefreshTokenExpirySeconds) * time.Second,
@@ -596,6 +633,8 @@ func initializeOAuth2Provider() error {
 		GlobalSecret: []byte(configuration.Security.JWTSecret),
 		// Set the ID token issuer
 		IDTokenIssuer: configuration.PublicBaseURL,
+		// RFC 7523 audience identity (token endpoint)
+		TokenURL: tokenURL,
 		// RFC 8693
 		TokenExchangeEnabled: true,
 		TokenExchangeTokenTypes: []string{
@@ -605,12 +644,17 @@ func initializeOAuth2Provider() error {
 	}
 	log.Printf("✅ Fosite config created")
 
-	// Set up custom client authentication strategy for attestation and proxy mode support
-	if attestationManager != nil || configuration.IsProxyMode() {
-		authStrategy := auth.NewClientAuthStrategy(attestationManager, customStorage, configuration)
-		config.ClientAuthenticationStrategy = authStrategy
-		log.Printf("✅ Custom client authentication strategy configured")
+	// RFC 7523 accepted audiences: token endpoint, issuer, introspection endpoint
+	assertionAudiences := []string{
+		tokenURL,
+		strings.TrimRight(configuration.PublicBaseURL, "/"),
+		configuration.PublicBaseURL,
+		introspectURL,
 	}
+	assertionVerifier = auth.NewAssertionVerifier(customStorage, secretManager, assertionAudiences)
+	authStrategy := auth.NewClientAuthStrategy(attestationManager, customStorage, configuration, assertionVerifier)
+	config.ClientAuthenticationStrategy = authStrategy
+	log.Printf("✅ Client authentication strategy configured (RFC 7523 + attestation)")
 
 	// Setup the RFC8693 handler...
 	AccessTokenStrategy = compose.NewOAuth2HMACStrategy(config)
@@ -673,7 +717,7 @@ func initializeHandlers() {
 	// Initialize OAuth2 flow handlers
 	authorizeHandler = handlers.NewAuthorizeHandler(oauth2Provider, configuration, log, metricsCollector, customStorage, &UpstreamSessionMap)
 	tokenHandler = handlers.NewTokenHandler(oauth2Provider, configuration, log, metricsCollector, attestationManager, customStorage, secretManager, &authCodeToStateMap, &authCodeToNonceMap, &authCodeToDPoPJKTMap, &deviceCodeToUpstreamMap, &accessTokenToIssuerStateMap, AccessTokenStrategy, RefreshTokenStrategy, jwtSigner)
-	introspectionHandler = handlers.NewIntrospectionHandler(oauth2Provider, configuration, log, attestationManager, dataStore, secretManager, privilegedClientSecrets, &accessTokenToIssuerStateMap)
+	introspectionHandler = handlers.NewIntrospectionHandler(oauth2Provider, configuration, log, attestationManager, dataStore, secretManager, assertionVerifier, privilegedClientSecrets, &accessTokenToIssuerStateMap)
 	authorizationIntrospectionHandler = handlers.NewAuthorizationIntrospectionHandler(oauth2Provider, configuration, log, dataStore, secretManager, privilegedClientSecrets, &accessTokenToIssuerStateMap)
 	revokeHandler = handlers.NewRevokeHandler(oauth2Provider, log)
 	userinfoHandler = handlers.NewUserInfoHandler(configuration, oauth2Provider, metricsCollector, log, dataStore, &accessTokenToIssuerStateMap)

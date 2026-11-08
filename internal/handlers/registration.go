@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"oauth2-server/internal/attestation"
+	"oauth2-server/internal/auth"
 	"oauth2-server/internal/store"
 	"oauth2-server/internal/store/types"
 	"oauth2-server/internal/utils"
@@ -142,14 +143,8 @@ func (h *RegistrationHandler) HandleRegistration(w http.ResponseWriter, r *http.
 		h.log.Printf("🔍 [REGISTRATION] Update operation - retrieving existing client secret")
 		// For updates, keep the existing secret
 		if existingClient, err := h.storage.GetClient(r.Context(), clientID); err == nil {
-			if defaultClient, ok := existingClient.(*fosite.DefaultClient); ok {
-				hashedSecret = defaultClient.Secret
-				h.log.Printf("✅ [REGISTRATION] Retrieved existing hashed secret")
-			} else {
-				h.log.Errorf("❌ [REGISTRATION] Failed to cast existing client to DefaultClient")
-				http.Error(w, "Failed to access existing client secret", http.StatusInternalServerError)
-				return
-			}
+			hashedSecret = existingClient.GetHashedSecret()
+			h.log.Printf("✅ [REGISTRATION] Retrieved existing hashed secret")
 		} else {
 			h.log.Errorf("❌ [REGISTRATION] Existing client not found in storage: %v", err)
 			http.Error(w, "Client not found", http.StatusNotFound)
@@ -192,7 +187,36 @@ func (h *RegistrationHandler) HandleRegistration(w http.ResponseWriter, r *http.
 
 	// Validate attestation configuration if using attestation auth
 	authMethod := metadata.TokenEndpointAuthMethod
+	if authMethod == "" {
+		if isPublic {
+			authMethod = "none"
+		} else {
+			authMethod = "client_secret_basic"
+		}
+		metadata.TokenEndpointAuthMethod = authMethod
+	}
 	h.log.Printf("🔍 [REGISTRATION] Checking attestation validation for auth method: '%s'", authMethod)
+
+	if authMethod == "private_key_jwt" {
+		if len(metadata.Jwks) == 0 && metadata.JwksURI == "" {
+			h.log.Errorf("❌ [REGISTRATION] private_key_jwt requires jwks or jwks_uri")
+			http.Error(w, "private_key_jwt requires jwks or jwks_uri", http.StatusBadRequest)
+			return
+		}
+	}
+	if authMethod == "client_secret_jwt" && isPublic {
+		h.log.Errorf("❌ [REGISTRATION] client_secret_jwt requires a confidential client")
+		http.Error(w, "client_secret_jwt requires a confidential client with a secret", http.StatusBadRequest)
+		return
+	}
+
+	parsedJWKS, err := auth.ParseClientJWKS(metadata.Jwks)
+	if err != nil {
+		h.log.Errorf("❌ [REGISTRATION] Invalid jwks: %v", err)
+		http.Error(w, "Invalid jwks: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	if authMethod == "attest_jwt_client_auth" || authMethod == "attest_tls_client_auth" {
 		h.log.Printf("🔍 [REGISTRATION] Attestation-based auth method detected, validating config")
 		if metadata.AttestationConfig == nil {
@@ -313,6 +337,16 @@ func (h *RegistrationHandler) HandleRegistration(w http.ResponseWriter, r *http.
 	} else {
 		clientSecretBytes = hashedSecret
 	}
+	signingAlg := metadata.TokenEndpointAuthSigningAlgorithm
+	if signingAlg == "" {
+		switch authMethod {
+		case "client_secret_jwt":
+			signingAlg = "HS256"
+		case "private_key_jwt":
+			signingAlg = "RS256"
+		}
+	}
+
 	newClient := &types.CustomClient{
 		DefaultClient: &fosite.DefaultClient{
 			ID:            clientID,
@@ -324,9 +358,13 @@ func (h *RegistrationHandler) HandleRegistration(w http.ResponseWriter, r *http.
 			Audience:      audience,
 			Public:        isPublic,
 		},
-		Claims:              claims,
-		ForceAuthentication: metadata.ForceAuthentication,
-		ForceConsent:        metadata.ForceConsent,
+		Claims:                            claims,
+		ForceAuthentication:               metadata.ForceAuthentication,
+		ForceConsent:                      metadata.ForceConsent,
+		JSONWebKeysURI:                    metadata.JwksURI,
+		JSONWebKeys:                       parsedJWKS,
+		TokenEndpointAuthMethod:           authMethod,
+		TokenEndpointAuthSigningAlgorithm: signingAlg,
 	}
 	h.log.Printf("✅ [REGISTRATION] store.CustomClient created successfully")
 	h.log.Printf("🔍 [REGISTRATION] Client details: ID=%s, Public=%v, GrantTypes=%v, ResponseTypes=%v, Scopes=%v, Claims=%v, Audience=%v",
@@ -395,33 +433,34 @@ func (h *RegistrationHandler) HandleRegistration(w http.ResponseWriter, r *http.
 		responseSecret = clientSecret
 	}
 	response := ClientResponse{
-		ClientID:                clientID,
-		ClientSecret:            responseSecret,
-		ClientSecretExpiresAt:   0, // 0 means no expiration
-		ClientIdIssuedAt:        now,
-		RegistrationAccessToken: "", // Not implemented in this example
-		RegistrationClientURI:   "", // Not implemented in this example
-		RedirectURIs:            metadata.RedirectURIs,
-		TokenEndpointAuthMethod: metadata.TokenEndpointAuthMethod,
-		GrantTypes:              grantTypes,
-		ResponseTypes:           responseTypes,
-		ClientName:              metadata.ClientName,
-		ClientURI:               metadata.ClientURI,
-		LogoURI:                 metadata.LogoURI,
-		Scope:                   strings.Join(scopes, " "),
-		Claims:                  strings.Join(claims, " "),
-		Contacts:                metadata.Contacts,
-		TermsOfServiceURI:       metadata.TermsOfServiceURI,
-		PolicyURI:               metadata.PolicyURI,
-		JwksURI:                 metadata.JwksURI,
-		Jwks:                    metadata.Jwks,
-		SoftwareID:              metadata.SoftwareID,
-		SoftwareVersion:         metadata.SoftwareVersion,
-		ForceAuthentication:     metadata.ForceAuthentication,
-		ForceConsent:            metadata.ForceConsent,
-		Audience:                audience,
-		AttestationConfig:       finalAttestationConfig,
-		Public:                  isPublic,
+		ClientID:                          clientID,
+		ClientSecret:                      responseSecret,
+		ClientSecretExpiresAt:             0, // 0 means no expiration
+		ClientIdIssuedAt:                  now,
+		RegistrationAccessToken:           "", // Not implemented in this example
+		RegistrationClientURI:             "", // Not implemented in this example
+		RedirectURIs:                      metadata.RedirectURIs,
+		TokenEndpointAuthMethod:           authMethod,
+		TokenEndpointAuthSigningAlgorithm: signingAlg,
+		GrantTypes:                        grantTypes,
+		ResponseTypes:                     responseTypes,
+		ClientName:                        metadata.ClientName,
+		ClientURI:                         metadata.ClientURI,
+		LogoURI:                           metadata.LogoURI,
+		Scope:                             strings.Join(scopes, " "),
+		Claims:                            strings.Join(claims, " "),
+		Contacts:                          metadata.Contacts,
+		TermsOfServiceURI:                 metadata.TermsOfServiceURI,
+		PolicyURI:                         metadata.PolicyURI,
+		JwksURI:                           metadata.JwksURI,
+		Jwks:                              metadata.Jwks,
+		SoftwareID:                        metadata.SoftwareID,
+		SoftwareVersion:                   metadata.SoftwareVersion,
+		ForceAuthentication:               metadata.ForceAuthentication,
+		ForceConsent:                      metadata.ForceConsent,
+		Audience:                          audience,
+		AttestationConfig:                 finalAttestationConfig,
+		Public:                            isPublic,
 	}
 	h.log.Printf("✅ [REGISTRATION] Response prepared successfully")
 

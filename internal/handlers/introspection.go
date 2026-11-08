@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"oauth2-server/internal/attestation"
+	"oauth2-server/internal/auth"
 	"oauth2-server/internal/dpop"
 	"oauth2-server/internal/store"
 	"oauth2-server/pkg/config"
@@ -27,12 +28,13 @@ type IntrospectionHandler struct {
 	AttestationManager          *attestation.VerifierManager
 	Storage                     store.Storage
 	SecretManager               *store.SecretManager
+	AssertionVerifier           *auth.AssertionVerifier
 	PrivilegedClientSecrets     map[string]string
 	AccessTokenToIssuerStateMap *map[string]string
 }
 
 // NewIntrospectionHandler creates a new introspection handler
-func NewIntrospectionHandler(oauth2Provider fosite.OAuth2Provider, config *config.Config, log *logrus.Logger, attestationManager *attestation.VerifierManager, storage store.Storage, secretManager *store.SecretManager, privilegedClientSecrets map[string]string, accessTokenToIssuerStateMap *map[string]string) *IntrospectionHandler {
+func NewIntrospectionHandler(oauth2Provider fosite.OAuth2Provider, config *config.Config, log *logrus.Logger, attestationManager *attestation.VerifierManager, storage store.Storage, secretManager *store.SecretManager, assertionVerifier *auth.AssertionVerifier, privilegedClientSecrets map[string]string, accessTokenToIssuerStateMap *map[string]string) *IntrospectionHandler {
 	return &IntrospectionHandler{
 		OAuth2Provider:              oauth2Provider,
 		Config:                      config,
@@ -40,6 +42,7 @@ func NewIntrospectionHandler(oauth2Provider fosite.OAuth2Provider, config *confi
 		AttestationManager:          attestationManager,
 		Storage:                     storage,
 		SecretManager:               secretManager,
+		AssertionVerifier:           assertionVerifier,
 		PrivilegedClientSecrets:     privilegedClientSecrets,
 		AccessTokenToIssuerStateMap: accessTokenToIssuerStateMap,
 	}
@@ -315,61 +318,68 @@ func (h *IntrospectionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	// Handle JWT client assertion authentication AFTER attestation check
-	var jwtAuthenticatedClientID string
+	// Handle JWT client assertion authentication (RFC 7523 + attestation)
 	if hasJwtAssertion {
+		clientAssertionType := r.FormValue("client_assertion_type")
 		clientAssertion := r.FormValue("client_assertion")
 		if clientAssertion == "" {
 			h.Log.Errorf("❌ JWT assertion type present but client_assertion is empty")
-		} else {
-			// Safely truncate for logging
-			assertionPreview := clientAssertion
-			if len(assertionPreview) > 50 {
-				assertionPreview = assertionPreview[:50]
-			}
-			h.Log.Debugf("🔍 Processing JWT client assertion: %s...", assertionPreview)
-
-			// First verify attestation if this is an attestation-based request
-			if extractedClientID := h.extractClientIDFromJWT(clientAssertion); extractedClientID != "" {
-				h.Log.Debugf("✅ Extracted client ID from JWT assertion: %s", extractedClientID)
-
-				// Check if this client is configured for attestation
-				if h.AttestationManager != nil && h.AttestationManager.IsAttestationEnabled(extractedClientID) {
-					h.Log.Debugf("🔍 Client %s is configured for attestation - verifying attestation first", extractedClientID)
-
-					// Get verifier for JWT attestation
-					verifier, err := h.AttestationManager.GetVerifier(extractedClientID, "attest_jwt_client_auth")
-					if err != nil {
-						h.Log.Errorf("❌ Failed to get verifier for client %s: %v", extractedClientID, err)
-					} else if jwtVerifier, ok := verifier.(attestation.AttestationVerifier); ok {
-						if result, err := jwtVerifier.VerifyAttestation(clientAssertion); err == nil && result.Valid {
-							h.Log.Debugf("✅ Attestation verified for client: %s", extractedClientID)
-							jwtAuthenticatedClientID = extractedClientID
-
-							// Store attestation result in request context
-							attestation.WithAttestationResult(r.Context(), result)
-
-							// Use privileged client for the actual introspection
-							h.Log.Debugf("🔄 Attestation verified - using privileged client for introspection")
-							h.handlePrivilegedIntrospectionWithAttestation(w, r, extractedClientID)
-							return
-						} else {
-							h.Log.Errorf("❌ Attestation verification failed: %v", err)
-						}
-					} else {
-						h.Log.Errorf("❌ Invalid JWT verifier type for client: %s", extractedClientID)
-					}
-				} else {
-					// Not an attestation client, handle as regular JWT authentication
-					h.Log.Debugf("🔍 Client %s not configured for attestation - treating as regular JWT auth", extractedClientID)
-					jwtAuthenticatedClientID = extractedClientID
-					h.handleLocalIntrospectionWithCredentials(w, r, jwtAuthenticatedClientID)
-					return
-				}
-			} else {
-				h.Log.Errorf("❌ Failed to extract client ID from JWT assertion")
-			}
+			http.Error(w, "invalid_client", http.StatusUnauthorized)
+			return
 		}
+
+		assertionPreview := clientAssertion
+		if len(assertionPreview) > 50 {
+			assertionPreview = assertionPreview[:50]
+		}
+		h.Log.Debugf("🔍 Processing JWT client assertion: %s...", assertionPreview)
+
+		extractedClientID := h.extractClientIDFromJWT(clientAssertion)
+		if extractedClientID != "" && h.AttestationManager != nil && h.AttestationManager.IsAttestationEnabled(extractedClientID) {
+			h.Log.Debugf("🔍 Client %s is configured for attestation - verifying attestation first", extractedClientID)
+			verifier, err := h.AttestationManager.GetVerifier(extractedClientID, "attest_jwt_client_auth")
+			if err != nil {
+				h.Log.Errorf("❌ Failed to get verifier for client %s: %v", extractedClientID, err)
+				http.Error(w, "invalid_client", http.StatusUnauthorized)
+				return
+			}
+			jwtVerifier, ok := verifier.(attestation.AttestationVerifier)
+			if !ok {
+				h.Log.Errorf("❌ Invalid JWT verifier type for client: %s", extractedClientID)
+				http.Error(w, "invalid_client", http.StatusUnauthorized)
+				return
+			}
+			result, err := jwtVerifier.VerifyAttestation(clientAssertion)
+			if err != nil || result == nil || !result.Valid {
+				h.Log.Errorf("❌ Attestation verification failed: %v", err)
+				http.Error(w, "invalid_client", http.StatusUnauthorized)
+				return
+			}
+			if h.AssertionVerifier != nil && !attestationAudienceOK(result.Audiences, h.AssertionVerifier.AcceptedAudiences) {
+				h.Log.Errorf("❌ Attestation audience does not match this authorization server")
+				http.Error(w, "invalid_client", http.StatusUnauthorized)
+				return
+			}
+			h.Log.Debugf("✅ Attestation verified for client: %s", extractedClientID)
+			attestation.WithAttestationResult(r.Context(), result)
+			h.handlePrivilegedIntrospectionWithAttestation(w, r, extractedClientID)
+			return
+		}
+
+		if h.AssertionVerifier == nil {
+			h.Log.Errorf("❌ JWT client assertion verifier is not configured")
+			http.Error(w, "invalid_client", http.StatusUnauthorized)
+			return
+		}
+		client, err := h.AssertionVerifier.Authenticate(r.Context(), clientAssertionType, clientAssertion, r.FormValue("client_id"))
+		if err != nil {
+			h.Log.Errorf("❌ RFC 7523 client assertion verification failed: %v", err)
+			http.Error(w, "invalid_client", http.StatusUnauthorized)
+			return
+		}
+		h.Log.Debugf("✅ RFC 7523 client assertion verified for client: %s", client.GetID())
+		h.handleLocalIntrospectionWithCredentials(w, r, client.GetID())
+		return
 	}
 
 	// Extract client ID for privileged check
@@ -1070,7 +1080,21 @@ func (h *IntrospectionHandler) performUpstreamIntrospection(w http.ResponseWrite
 	h.Log.Infof("✅ [PROXY-INTROSPECT] Public client introspection response completed successfully")
 }
 
-// extractClientIDFromJWT extracts the client_id from a JWT client assertion
+func attestationAudienceOK(got, accepted []string) bool {
+	for _, want := range accepted {
+		if want == "" {
+			continue
+		}
+		for _, a := range got {
+			if a == want {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// extractClientIDFromJWT extracts the client_id from a JWT client assertion (unverified peek for routing only).
 func (h *IntrospectionHandler) extractClientIDFromJWT(clientAssertion string) string {
 	if clientAssertion == "" {
 		return ""

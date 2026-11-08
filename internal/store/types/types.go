@@ -7,21 +7,76 @@ import (
 
 	"oauth2-server/pkg/config"
 
+	"github.com/go-jose/go-jose/v3"
 	"github.com/ory/fosite"
 	"github.com/ory/fosite/storage"
 )
 
-// CustomClient extends fosite.DefaultClient with claims support
+// CustomClient extends fosite.DefaultClient with claims support and RFC 7523 / OIDC client auth fields.
 type CustomClient struct {
 	*fosite.DefaultClient
 	Claims              []string `json:"claims,omitempty"`
 	ForceAuthentication bool     `json:"force_authentication,omitempty"`
 	ForceConsent        bool     `json:"force_consent,omitempty"`
+
+	// OpenID Connect / RFC 7523 client authentication fields
+	JSONWebKeysURI                    string              `json:"jwks_uri,omitempty"`
+	JSONWebKeys                       *jose.JSONWebKeySet `json:"jwks,omitempty"`
+	TokenEndpointAuthMethod           string              `json:"token_endpoint_auth_method,omitempty"`
+	TokenEndpointAuthSigningAlgorithm string              `json:"token_endpoint_auth_signing_alg,omitempty"`
+	RequestURIs                       []string            `json:"request_uris,omitempty"`
+	RequestObjectSigningAlgorithm     string              `json:"request_object_signing_alg,omitempty"`
+
 	// CIMD fields
 	MetadataDocumentLocation     string `json:"metadata_document_location,omitempty"`
 	MetadataDocumentExpiresAt    int64  `json:"metadata_document_expires_at,omitempty"`
 	MetadataDocumentUpdatedAt    int64  `json:"metadata_document_updated_at,omitempty"`
 	DiscoveredByMetadataDocument bool   `json:"discovered_by_metadata_document,omitempty"`
+}
+
+// Ensure CustomClient implements fosite.OpenIDConnectClient for private_key_jwt.
+var _ fosite.OpenIDConnectClient = (*CustomClient)(nil)
+
+// GetJSONWebKeysURI returns the client's jwks_uri.
+func (c *CustomClient) GetJSONWebKeysURI() string {
+	return c.JSONWebKeysURI
+}
+
+// GetJSONWebKeys returns the client's registered JWKS.
+func (c *CustomClient) GetJSONWebKeys() *jose.JSONWebKeySet {
+	return c.JSONWebKeys
+}
+
+// GetTokenEndpointAuthMethod returns the registered token endpoint auth method.
+func (c *CustomClient) GetTokenEndpointAuthMethod() string {
+	if c.TokenEndpointAuthMethod != "" {
+		return c.TokenEndpointAuthMethod
+	}
+	if c.IsPublic() {
+		return "none"
+	}
+	return "client_secret_basic"
+}
+
+// GetTokenEndpointAuthSigningAlgorithm returns the JWT auth signing algorithm.
+func (c *CustomClient) GetTokenEndpointAuthSigningAlgorithm() string {
+	if c.TokenEndpointAuthSigningAlgorithm == "" {
+		if c.GetTokenEndpointAuthMethod() == "client_secret_jwt" {
+			return "HS256"
+		}
+		return "RS256"
+	}
+	return c.TokenEndpointAuthSigningAlgorithm
+}
+
+// GetRequestURIs returns pre-registered request_uri values.
+func (c *CustomClient) GetRequestURIs() []string {
+	return c.RequestURIs
+}
+
+// GetRequestObjectSigningAlgorithm returns the request object signing algorithm.
+func (c *CustomClient) GetRequestObjectSigningAlgorithm() string {
+	return c.RequestObjectSigningAlgorithm
 }
 
 // PARRequest represents a pushed authorization request

@@ -267,23 +267,26 @@ type DatabaseConfig struct {
 
 // ClientConfig represents a client configuration from YAML
 type ClientConfig struct {
-	ID                      string                   `yaml:"id"`
-	Secret                  string                   `yaml:"secret"`
-	Name                    string                   `yaml:"name"`
-	Description             string                   `yaml:"description"`
-	RedirectURIs            []string                 `yaml:"redirect_uris"`
-	GrantTypes              []string                 `yaml:"grant_types"`
-	ResponseTypes           []string                 `yaml:"response_types"`
-	Scopes                  []string                 `yaml:"scopes"`
-	Claims                  []string                 `yaml:"claims"`
-	ForceAuthentication     bool                     `yaml:"force_authentication" json:"force_authentication,omitempty"`
-	ForceConsent            bool                     `yaml:"force_consent" json:"force_consent,omitempty"`
-	Audience                []string                 `yaml:"audience"`
-	TokenEndpointAuthMethod string                   `yaml:"token_endpoint_auth_method"`
-	Public                  bool                     `yaml:"public"`
-	EnabledFlows            []string                 `yaml:"enabled_flows"`
-	Enabled                 *bool                    `yaml:"enabled,omitempty"` // Pointer to distinguish between false and unset
-	AttestationConfig       *ClientAttestationConfig `yaml:"attestation_config,omitempty"`
+	ID                                string                   `yaml:"id"`
+	Secret                            string                   `yaml:"secret"`
+	Name                              string                   `yaml:"name"`
+	Description                       string                   `yaml:"description"`
+	RedirectURIs                      []string                 `yaml:"redirect_uris"`
+	GrantTypes                        []string                 `yaml:"grant_types"`
+	ResponseTypes                     []string                 `yaml:"response_types"`
+	Scopes                            []string                 `yaml:"scopes"`
+	Claims                            []string                 `yaml:"claims"`
+	ForceAuthentication               bool                     `yaml:"force_authentication" json:"force_authentication,omitempty"`
+	ForceConsent                      bool                     `yaml:"force_consent" json:"force_consent,omitempty"`
+	Audience                          []string                 `yaml:"audience"`
+	TokenEndpointAuthMethod           string                   `yaml:"token_endpoint_auth_method"`
+	TokenEndpointAuthSigningAlgorithm string                   `yaml:"token_endpoint_auth_signing_alg"`
+	JwksURI                           string                   `yaml:"jwks_uri"`
+	Jwks                              string                   `yaml:"jwks"`
+	Public                            bool                     `yaml:"public"`
+	EnabledFlows                      []string                 `yaml:"enabled_flows"`
+	Enabled                           *bool                    `yaml:"enabled,omitempty"` // Pointer to distinguish between false and unset
+	AttestationConfig                 *ClientAttestationConfig `yaml:"attestation_config,omitempty"`
 }
 
 // ConfigClient is an alias for ClientConfig for backward compatibility

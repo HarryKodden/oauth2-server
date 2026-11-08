@@ -107,8 +107,6 @@ run_test_with_timeout() {
     fi
 }
 
-cd /Users/kodde001/Projects/oauth2-server
-
 # Check if Docker is available
 if command -v docker >/dev/null 2>&1; then
     POSTGRES_AVAILABLE=true
@@ -209,15 +207,17 @@ echo -e "${YELLOW}===================================${NC}"
 total_tests=8
 passed_tests=0
 
-# Count passed tests
-[ $compliance_result -eq 0 ] && ((passed_tests++))
-[ $all_impl_result -eq 0 ] && ((passed_tests++))
-[ $golden_result -eq 0 ] && ((passed_tests++))
-[ $schema_result -eq 0 ] && ((passed_tests++))
-[ $migration_result -eq 0 ] && ((passed_tests++))
-[ $property_result -eq 0 ] && ((passed_tests++))
-[ $concurrency_result -eq 0 ] && ((passed_tests++))
-[ $race_result -eq 0 ] && ((passed_tests++))
+# Count passed tests.
+# Use arithmetic assignment (not ((var++))) so set -e does not abort when
+# the pre-increment value is 0 (bash treats ((0)) as a failing status).
+[ "$compliance_result" -eq 0 ] && passed_tests=$((passed_tests + 1))
+[ "$all_impl_result" -eq 0 ] && passed_tests=$((passed_tests + 1))
+[ "$golden_result" -eq 0 ] && passed_tests=$((passed_tests + 1))
+[ "$schema_result" -eq 0 ] && passed_tests=$((passed_tests + 1))
+[ "$migration_result" -eq 0 ] && passed_tests=$((passed_tests + 1))
+[ "$property_result" -eq 0 ] && passed_tests=$((passed_tests + 1))
+[ "$concurrency_result" -eq 0 ] && passed_tests=$((passed_tests + 1))
+[ "$race_result" -eq 0 ] && passed_tests=$((passed_tests + 1))
 
 echo "Tests Passed: $passed_tests/$total_tests"
 

@@ -50,6 +50,15 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 - **State Persistence**: Maintains authorization state through OAuth2 proxy flows
 - **UserInfo Integration**: Returns `issuer_state` in userinfo responses when present in original authorization request
 
+### 🔏 JWT Client Authentication (RFC 7523)
+- **`private_key_jwt`**: Clients authenticate at the token and introspection endpoints with a signed JWT (`client_assertion` / `client_assertion_type`)
+- **`client_secret_jwt`**: Same wire format, HMAC-signed with the client secret
+- **Claim validation**: Requires `iss`, `sub`, `aud`, `exp` (optional `nbf` / `iat`); `sub` must equal `client_id`
+- **Audience binding**: Assertion `aud` must identify this authorization server (token URL, issuer, or introspection URL)
+- **Replay protection**: One-time `jti` storage plus max assertion lifetime
+- **Registration**: Clients register with `jwks` / `jwks_uri` and `token_endpoint_auth_method`
+- **Not yet**: JWT authorization grant (`grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer`) — see `TODO.md`
+
 ### 🔒 OAuth 2.0 Attestation-Based Client Authentication
 - **Enterprise Security**: Hardware-backed client authentication for mobile and IoT devices
 - **Trust Levels**: Configurable trust requirements based on attestation strength
@@ -58,6 +67,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 - **Comprehensive Debugging**: Detailed logging for attestation verification steps
 - **Privileged Client Audience Inclusion**: Attestation-enabled clients automatically get privileged clients added to their audience for token introspection access
 - **Standards Compliance**: Follows draft-ietf-oauth-attestation-based-client-auth-07
+- **Separate from RFC 7523**: Attestation JWT auth is a related extension; vanilla `private_key_jwt` / `client_secret_jwt` use the RFC 7523 path above
 
 ### 🔑 DPoP — Demonstrating Proof of Possession (RFC 9449)
 - **Sender-constrained tokens**: Bind access tokens to a client-held key via DPoP proofs
@@ -88,6 +98,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 
 ### RFC Compliance
 - ✅ **RFC 6749** - OAuth 2.0 Authorization Framework
+- ✅ **RFC 7523** - JWT Profile for OAuth 2.0 Client Authentication (authorization grant deferred; see `TODO.md`)
 - ✅ **RFC 8628** - Device Authorization Grant
 - ✅ **RFC 8693** - Token Exchange
 - ✅ **RFC 9126** - OAuth 2.0 Pushed Authorization Requests
@@ -114,7 +125,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 ## Project Structure
 
 - **cmd/server/main.go**: Entry point of the application. Initializes the server and sets up routes and middleware.
-- **internal/auth/**: Authentication and authorization logic for OAuth2 flows.
+- **internal/auth/**: Client authentication strategies, including RFC 7523 JWT client assertion verification (`private_key_jwt` / `client_secret_jwt`).
 - **internal/attestation/**: OAuth 2.0 Attestation-Based Client Authentication implementation with JWT and TLS certificate verification, comprehensive debugging, and proxy mode support.
 - **internal/flows/**: Implements various OAuth2 flows.
 - **internal/handlers/**: Defines HTTP handlers for API endpoints including trust anchor management, dynamic client registration, and pushed authorization requests (removed unused secret_manager.go file).
@@ -130,6 +141,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
   - `test_proxy_dpop_refresh.sh`: Proxy refresh_token preserves DPoP binding (`DPOP_REQUIRED=true`)
   - `test_proxy_dpop_par.sh`: Proxy PAR carries `dpop_jkt` through `request_uri` to token binding
   - `test_attestation_privileged_audience.sh`: Validates privileged client audience inclusion for attestation-enabled clients
+  - `test_rfc7523_private_key_jwt.sh`: RFC 7523 `private_key_jwt` token request, signature/claims checks, and `jti` replay rejection
   - `test_introspection_jwt_client_assertion.sh`: Validates JWT client assertion authentication for token introspection
   - `test_refresh_token_basic.sh`: Basic refresh token functionality testing
   - `test_refresh_token_exchange.sh`: Advanced refresh token exchange testing
@@ -137,6 +149,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 ## Features
 
 - **OAuth2 Authorization Flows**: Authorization Code, Client Credentials, Device Authorization, Refresh Token, Token Exchange, Pushed Authorization Requests (PAR)
+- **RFC 7523 JWT Client Authentication**: `private_key_jwt` and `client_secret_jwt` at token and introspection endpoints (JWT authorization grant not yet implemented)
 - **Attestation-Based Authentication**: Hardware-backed client authentication with JWT and TLS certificate support, proxy mode verification, and comprehensive debugging
 - **Trust Anchor Management**: Dynamic upload and management of X.509 trust anchor certificates for attestation validation
 - **OpenID 4 Verifiable Credentials**: Full `issuer_state` parameter support for verifiable credential issuance flows
@@ -276,6 +289,7 @@ Testing test_public_client_flow.sh               ... ✅ PASSED
 Testing test_pushed_authorize_request.sh         ... ✅ PASSED
 Testing test_refresh_token_basic.sh              ... ✅ PASSED
 Testing test_refresh_token_exchange.sh           ... ✅ PASSED
+Testing test_rfc7523_private_key_jwt.sh          ... ✅ PASSED
 Testing test_scope_handling.sh                   ... ✅ PASSED
 Testing test_storage_consistency.sh              ... ✅ PASSED
 Testing test_token_exchange.sh                   ... ✅ PASSED
@@ -283,7 +297,7 @@ Testing test_userinfo.sh                         ... ✅ PASSED
 Testing test_validation.sh                       ... ✅ PASSED
 
 ════════════════════════════════════════════════════════════════
-📊 Test Summary: 37 passed, 0 failed
+📊 Test Summary: 38 passed, 0 failed
 ════════════════════════════════════════════════════════════════
 ✅ All tests passed!
 ```

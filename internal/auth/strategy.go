@@ -25,14 +25,21 @@ type ClientAuthStrategy struct {
 	AttestationManager *attestation.VerifierManager
 	Storage            store.Storage
 	Config             *config.Config
+	AssertionVerifier  *AssertionVerifier
 }
 
 // NewClientAuthStrategy creates a new composite client authentication strategy
-func NewClientAuthStrategy(attestationManager *attestation.VerifierManager, storage store.Storage, config *config.Config) fosite.ClientAuthenticationStrategy {
+func NewClientAuthStrategy(
+	attestationManager *attestation.VerifierManager,
+	storage store.Storage,
+	cfg *config.Config,
+	assertionVerifier *AssertionVerifier,
+) fosite.ClientAuthenticationStrategy {
 	strategy := &ClientAuthStrategy{
 		AttestationManager: attestationManager,
 		Storage:            storage,
-		Config:             config,
+		Config:             cfg,
+		AssertionVerifier:  assertionVerifier,
 	}
 	return strategy.AuthenticateClient
 }
@@ -121,12 +128,13 @@ func (s *ClientAuthStrategy) AuthenticateClient(ctx context.Context, r *http.Req
 	if clientID != "" && s.AttestationManager != nil && s.AttestationManager.IsAttestationEnabled(clientID) {
 		authMethod := s.determineAuthMethod(form)
 		if authMethod != "" {
-			// Try attestation authentication
 			client, err := s.authenticateWithAttestation(ctx, form, authMethod)
-			if err == nil && client != nil {
+			if err != nil {
+				return nil, err
+			}
+			if client != nil {
 				return client, nil
 			}
-			// If attestation fails, continue to standard auth methods
 		}
 	}
 
@@ -225,6 +233,13 @@ func (s *ClientAuthStrategy) authenticateWithAttestation(ctx context.Context, fo
 		return nil, fosite.ErrInvalidClient.WithHint("Invalid attestation")
 	}
 
+	// Enforce that attestation audience includes this authorization server when configured.
+	if s.AssertionVerifier != nil && len(s.AssertionVerifier.AcceptedAudiences) > 0 {
+		if !attestationAudienceAccepted(result.Audiences, s.AssertionVerifier.AcceptedAudiences) {
+			return nil, fosite.ErrInvalidClient.WithHint("Attestation audience does not match this authorization server")
+		}
+	}
+
 	// Get the client from store
 	client, err := s.Storage.GetClient(ctx, result.ClientID)
 	if err != nil {
@@ -241,6 +256,20 @@ func (s *ClientAuthStrategy) authenticateWithAttestation(ctx context.Context, fo
 	}
 
 	return wrappedClient, nil
+}
+
+func attestationAudienceAccepted(got, accepted []string) bool {
+	for _, want := range accepted {
+		if want == "" {
+			continue
+		}
+		for _, a := range got {
+			if a == want {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // authenticateStandard handles standard OAuth2 client authentication methods
@@ -295,25 +324,14 @@ func (s *ClientAuthStrategy) authenticateStandard(ctx context.Context, r *http.R
 		}
 	}
 
-	// Method 3: private_key_jwt (non-attestation)
-	if clientID != "" {
-		clientAssertionType := form.Get("client_assertion_type")
-		clientAssertion := form.Get("client_assertion")
-
-		if clientAssertionType == "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" && clientAssertion != "" {
-			// This is private_key_jwt authentication (not attestation)
-			// Verify the JWT signature and claims
-			if err := s.Storage.ClientAssertionJWTValid(ctx, clientID); err != nil {
-				return nil, fosite.ErrInvalidClient.WithHint("Invalid client assertion")
-			}
-
-			client, err := s.Storage.GetClient(ctx, clientID)
-			if err != nil {
-				return nil, fosite.ErrInvalidClient.WithHint("Unknown client")
-			}
-
-			return client, nil
+	// Method 3: RFC 7523 private_key_jwt / client_secret_jwt
+	clientAssertionType := form.Get("client_assertion_type")
+	clientAssertion := form.Get("client_assertion")
+	if clientAssertionType == clientAssertionJWTBearerType && clientAssertion != "" {
+		if s.AssertionVerifier == nil {
+			return nil, fosite.ErrServerError.WithHint("JWT client assertion authentication is not configured")
 		}
+		return s.AssertionVerifier.Authenticate(ctx, clientAssertionType, clientAssertion, clientID)
 	}
 
 	// Method 4: Public client (no authentication required)
@@ -338,7 +356,7 @@ func (s *ClientAuthStrategy) determineAuthMethod(form url.Values) string {
 
 	// Check for JWT attestation
 	clientAssertionType := form.Get("client_assertion_type")
-	if clientAssertionType == "urn:ietf:params:oauth:client-assertion-type:jwt-bearer" {
+	if clientAssertionType == clientAssertionJWTBearerType {
 		clientAssertion := form.Get("client_assertion")
 
 		// Check if the client is configured for attestation-based authentication

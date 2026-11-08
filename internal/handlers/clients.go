@@ -11,60 +11,62 @@ import (
 
 // ClientMetadata represents the client registration request
 type ClientMetadata struct {
-	ClientID                string                          `json:"client_id,omitempty"`
-	ClientSecret            string                          `json:"client_secret,omitempty"`
-	RedirectURIs            []string                        `json:"redirect_uris"`
-	TokenEndpointAuthMethod string                          `json:"token_endpoint_auth_method,omitempty"`
-	GrantTypes              []string                        `json:"grant_types,omitempty"`
-	ResponseTypes           []string                        `json:"response_types,omitempty"`
-	ClientName              string                          `json:"client_name,omitempty"`
-	ClientURI               string                          `json:"client_uri,omitempty"`
-	LogoURI                 string                          `json:"logo_uri,omitempty"`
-	Scope                   string                          `json:"scope,omitempty"`
-	Claims                  string                          `json:"claims,omitempty"`
-	Contacts                []string                        `json:"contacts,omitempty"`
-	TermsOfServiceURI       string                          `json:"tos_uri,omitempty"`
-	PolicyURI               string                          `json:"policy_uri,omitempty"`
-	JwksURI                 string                          `json:"jwks_uri,omitempty"`
-	Jwks                    string                          `json:"jwks,omitempty"`
-	SoftwareID              string                          `json:"software_id,omitempty"`
-	SoftwareVersion         string                          `json:"software_version,omitempty"`
-	ForceAuthentication     bool                            `json:"force_authentication,omitempty"`
-	ForceConsent            bool                            `json:"force_consent,omitempty"`
-	Audience                []string                        `json:"audience,omitempty"`
-	AttestationConfig       *config.ClientAttestationConfig `json:"attestation_config,omitempty"`
-	Public                  bool                            `json:"public,omitempty"`
+	ClientID                          string                          `json:"client_id,omitempty"`
+	ClientSecret                      string                          `json:"client_secret,omitempty"`
+	RedirectURIs                      []string                        `json:"redirect_uris"`
+	TokenEndpointAuthMethod           string                          `json:"token_endpoint_auth_method,omitempty"`
+	TokenEndpointAuthSigningAlgorithm string                          `json:"token_endpoint_auth_signing_alg,omitempty"`
+	GrantTypes                        []string                        `json:"grant_types,omitempty"`
+	ResponseTypes                     []string                        `json:"response_types,omitempty"`
+	ClientName                        string                          `json:"client_name,omitempty"`
+	ClientURI                         string                          `json:"client_uri,omitempty"`
+	LogoURI                           string                          `json:"logo_uri,omitempty"`
+	Scope                             string                          `json:"scope,omitempty"`
+	Claims                            string                          `json:"claims,omitempty"`
+	Contacts                          []string                        `json:"contacts,omitempty"`
+	TermsOfServiceURI                 string                          `json:"tos_uri,omitempty"`
+	PolicyURI                         string                          `json:"policy_uri,omitempty"`
+	JwksURI                           string                          `json:"jwks_uri,omitempty"`
+	Jwks                              json.RawMessage                 `json:"jwks,omitempty"`
+	SoftwareID                        string                          `json:"software_id,omitempty"`
+	SoftwareVersion                   string                          `json:"software_version,omitempty"`
+	ForceAuthentication               bool                            `json:"force_authentication,omitempty"`
+	ForceConsent                      bool                            `json:"force_consent,omitempty"`
+	Audience                          []string                        `json:"audience,omitempty"`
+	AttestationConfig                 *config.ClientAttestationConfig `json:"attestation_config,omitempty"`
+	Public                            bool                            `json:"public,omitempty"`
 }
 
 // ClientResponse represents the client registration response
 type ClientResponse struct {
-	ClientID                string                          `json:"client_id"`
-	ClientSecret            string                          `json:"client_secret,omitempty"`
-	ClientSecretExpiresAt   int64                           `json:"client_secret_expires_at"`
-	RegistrationAccessToken string                          `json:"registration_access_token,omitempty"`
-	RegistrationClientURI   string                          `json:"registration_client_uri,omitempty"`
-	ClientIdIssuedAt        int64                           `json:"client_id_issued_at"`
-	RedirectURIs            []string                        `json:"redirect_uris"`
-	TokenEndpointAuthMethod string                          `json:"token_endpoint_auth_method,omitempty"`
-	GrantTypes              []string                        `json:"grant_types,omitempty"`
-	ResponseTypes           []string                        `json:"response_types,omitempty"`
-	ClientName              string                          `json:"client_name,omitempty"`
-	ClientURI               string                          `json:"client_uri,omitempty"`
-	LogoURI                 string                          `json:"logo_uri,omitempty"`
-	Scope                   string                          `json:"scope,omitempty"`
-	Claims                  string                          `json:"claims,omitempty"`
-	Contacts                []string                        `json:"contacts,omitempty"`
-	TermsOfServiceURI       string                          `json:"tos_uri,omitempty"`
-	PolicyURI               string                          `json:"policy_uri,omitempty"`
-	JwksURI                 string                          `json:"jwks_uri,omitempty"`
-	Jwks                    string                          `json:"jwks,omitempty"`
-	SoftwareID              string                          `json:"software_id,omitempty"`
-	SoftwareVersion         string                          `json:"software_version,omitempty"`
-	ForceAuthentication     bool                            `json:"force_authentication,omitempty"`
-	ForceConsent            bool                            `json:"force_consent,omitempty"`
-	Audience                []string                        `json:"audience,omitempty"`
-	AttestationConfig       *config.ClientAttestationConfig `json:"attestation_config,omitempty"`
-	Public                  bool                            `json:"public,omitempty"`
+	ClientID                          string                          `json:"client_id"`
+	ClientSecret                      string                          `json:"client_secret,omitempty"`
+	ClientSecretExpiresAt             int64                           `json:"client_secret_expires_at"`
+	RegistrationAccessToken           string                          `json:"registration_access_token,omitempty"`
+	RegistrationClientURI             string                          `json:"registration_client_uri,omitempty"`
+	ClientIdIssuedAt                  int64                           `json:"client_id_issued_at"`
+	RedirectURIs                      []string                        `json:"redirect_uris"`
+	TokenEndpointAuthMethod           string                          `json:"token_endpoint_auth_method,omitempty"`
+	TokenEndpointAuthSigningAlgorithm string                          `json:"token_endpoint_auth_signing_alg,omitempty"`
+	GrantTypes                        []string                        `json:"grant_types,omitempty"`
+	ResponseTypes                     []string                        `json:"response_types,omitempty"`
+	ClientName                        string                          `json:"client_name,omitempty"`
+	ClientURI                         string                          `json:"client_uri,omitempty"`
+	LogoURI                           string                          `json:"logo_uri,omitempty"`
+	Scope                             string                          `json:"scope,omitempty"`
+	Claims                            string                          `json:"claims,omitempty"`
+	Contacts                          []string                        `json:"contacts,omitempty"`
+	TermsOfServiceURI                 string                          `json:"tos_uri,omitempty"`
+	PolicyURI                         string                          `json:"policy_uri,omitempty"`
+	JwksURI                           string                          `json:"jwks_uri,omitempty"`
+	Jwks                              json.RawMessage                 `json:"jwks,omitempty"`
+	SoftwareID                        string                          `json:"software_id,omitempty"`
+	SoftwareVersion                   string                          `json:"software_version,omitempty"`
+	ForceAuthentication               bool                            `json:"force_authentication,omitempty"`
+	ForceConsent                      bool                            `json:"force_consent,omitempty"`
+	Audience                          []string                        `json:"audience,omitempty"`
+	AttestationConfig                 *config.ClientAttestationConfig `json:"attestation_config,omitempty"`
+	Public                            bool                            `json:"public,omitempty"`
 }
 
 // HandleClients handles client management requests (GET and DELETE)
@@ -171,36 +173,54 @@ func (h *RegistrationHandler) handleGetClients(w http.ResponseWriter, r *http.Re
 			forceConsent = customClient.ForceConsent
 		}
 
+		authMethod := "client_secret_basic"
+		signingAlg := ""
+		jwksURI := ""
+		var jwks json.RawMessage
+		if customClient, ok := client.(*types.CustomClient); ok {
+			authMethod = customClient.GetTokenEndpointAuthMethod()
+			signingAlg = customClient.TokenEndpointAuthSigningAlgorithm
+			jwksURI = customClient.JSONWebKeysURI
+			if customClient.JSONWebKeys != nil {
+				if raw, err := json.Marshal(customClient.JSONWebKeys); err == nil {
+					jwks = raw
+				}
+			}
+		} else if client.IsPublic() {
+			authMethod = "none"
+		}
+
 		// Build response similar to registration response
 		now := time.Now().Unix()
 		response := ClientResponse{
-			ClientID:                client.GetID(),
-			ClientSecret:            clientSecret,
-			ClientSecretExpiresAt:   0, // 0 means no expiration
-			ClientIdIssuedAt:        now,
-			RegistrationAccessToken: "", // Not implemented
-			RegistrationClientURI:   "", // Not implemented
-			RedirectURIs:            client.GetRedirectURIs(),
-			TokenEndpointAuthMethod: "client_secret_basic", // Default, since not stored
-			GrantTypes:              client.GetGrantTypes(),
-			ResponseTypes:           client.GetResponseTypes(),
-			ClientName:              "", // Not stored
-			ClientURI:               "", // Not stored
-			LogoURI:                 "", // Not stored
-			Scope:                   strings.Join(client.GetScopes(), " "),
-			Claims:                  claims,
-			Contacts:                []string{}, // Not stored
-			TermsOfServiceURI:       "",         // Not stored
-			PolicyURI:               "",         // Not stored
-			JwksURI:                 "",         // Not stored
-			Jwks:                    "",         // Not stored
-			SoftwareID:              "",         // Not stored
-			SoftwareVersion:         "",         // Not stored
-			ForceAuthentication:     forceAuthentication,
-			ForceConsent:            forceConsent,
-			Audience:                client.GetAudience(),
-			AttestationConfig:       attestationConfig,
-			Public:                  client.IsPublic(),
+			ClientID:                          client.GetID(),
+			ClientSecret:                      clientSecret,
+			ClientSecretExpiresAt:             0, // 0 means no expiration
+			ClientIdIssuedAt:                  now,
+			RegistrationAccessToken:           "", // Not implemented
+			RegistrationClientURI:             "", // Not implemented
+			RedirectURIs:                      client.GetRedirectURIs(),
+			TokenEndpointAuthMethod:           authMethod,
+			TokenEndpointAuthSigningAlgorithm: signingAlg,
+			GrantTypes:                        client.GetGrantTypes(),
+			ResponseTypes:                     client.GetResponseTypes(),
+			ClientName:                        "", // Not stored
+			ClientURI:                         "", // Not stored
+			LogoURI:                           "", // Not stored
+			Scope:                             strings.Join(client.GetScopes(), " "),
+			Claims:                            claims,
+			Contacts:                          []string{}, // Not stored
+			TermsOfServiceURI:                 "",         // Not stored
+			PolicyURI:                         "",         // Not stored
+			JwksURI:                           jwksURI,
+			Jwks:                              jwks,
+			SoftwareID:                        "", // Not stored
+			SoftwareVersion:                   "", // Not stored
+			ForceAuthentication:               forceAuthentication,
+			ForceConsent:                      forceConsent,
+			Audience:                          client.GetAudience(),
+			AttestationConfig:                 attestationConfig,
+			Public:                            client.IsPublic(),
 		}
 
 		h.log.Printf("✅ [CLIENTS] Retrieved details for client: %s", clientID)
