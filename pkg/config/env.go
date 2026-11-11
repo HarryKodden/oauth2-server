@@ -221,8 +221,27 @@ func (c *Config) LoadFromEnv() {
 	// Add support for dynamic client configuration via environment variables
 	c.loadClientsFromEnv()
 
+	// Multiline JSON list/map of initial clients (overrides same IDs from YAML / CLIENT_*)
+	if err := c.loadInitialClientsFromEnv(); err != nil {
+		c.envErrors = append(c.envErrors, err)
+	}
+
 	// Add support for dynamic user configuration via environment variables
 	c.loadUsersFromEnv()
+}
+
+// loadInitialClientsFromEnv loads clients from the INITIAL_CLIENTS multiline JSON env var.
+func (c *Config) loadInitialClientsFromEnv() error {
+	raw := os.Getenv("INITIAL_CLIENTS")
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	clients, err := ParseInitialClientsJSON(raw)
+	if err != nil {
+		return err
+	}
+	c.Clients = mergeClientsByID(c.Clients, clients)
+	return nil
 }
 
 // loadClientsFromEnv loads additional clients from environment variables

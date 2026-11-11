@@ -135,6 +135,9 @@ type Config struct {
 	// PublicBaseURL     string
 	ForceHTTPS     bool
 	TrustedProxies string
+
+	// envErrors collects non-fatal-to-parse errors from LoadFromEnv for Validate().
+	envErrors []error
 }
 
 // DPoPConfig controls RFC 9449 Demonstrating Proof of Possession support.
@@ -324,6 +327,12 @@ func (c ClientConfig) HasAttestationAuth() bool {
 		c.TokenEndpointAuthMethod == "attest_tls_client_auth"
 }
 
+// HasJWTAssertionAuth returns whether this client authenticates with RFC 7523 JWT assertions.
+func (c ClientConfig) HasJWTAssertionAuth() bool {
+	return c.TokenEndpointAuthMethod == "private_key_jwt" ||
+		c.TokenEndpointAuthMethod == "client_secret_jwt"
+}
+
 // ValidateRedirectURI validates a redirect URI against this client's registered URIs
 func (c ClientConfig) ValidateRedirectURI(requestedURI string) bool {
 	return utils.ValidateClientRedirectURI(requestedURI, c.RedirectURIs)
@@ -331,6 +340,12 @@ func (c ClientConfig) ValidateRedirectURI(requestedURI string) bool {
 
 // Validate validates the configuration
 func (c *Config) Validate() error {
+	for _, err := range c.envErrors {
+		if err != nil {
+			return err
+		}
+	}
+
 	if c.Security.JWTSecret == "" {
 		return fmt.Errorf("JWT secret is required")
 	}
@@ -385,10 +400,19 @@ func (c *Config) Validate() error {
 			continue
 		}
 
-		// Public clients don't need secrets, but confidential clients do
-		// Exception: attestation-based auth doesn't require secrets
-		if !client.Public && client.Secret == "" && !client.HasAttestationAuth() {
+		// Public clients don't need secrets, but confidential clients do.
+		// Exceptions: attestation auth and private_key_jwt (asymmetric) don't require a shared secret.
+		needsSecret := !client.Public &&
+			!client.HasAttestationAuth() &&
+			client.TokenEndpointAuthMethod != "private_key_jwt"
+		if needsSecret && client.Secret == "" {
 			return fmt.Errorf("client %s: client secret is required for confidential clients", client.ID)
+		}
+		if client.TokenEndpointAuthMethod == "private_key_jwt" && client.Jwks == "" && client.JwksURI == "" {
+			return fmt.Errorf("client %s: private_key_jwt requires jwks or jwks_uri", client.ID)
+		}
+		if client.TokenEndpointAuthMethod == "client_secret_jwt" && client.Secret == "" {
+			return fmt.Errorf("client %s: client_secret_jwt requires a client secret", client.ID)
 		}
 
 		// Validate grant types

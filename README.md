@@ -477,7 +477,66 @@ UPSTREAM_PROMPT_POLICY_EDUID_AUTHZ_DETAILS_MATCH_CREDENTIAL_CONFIGURATION_ID=edu
 
 ### Dynamic Client Configuration
 
-Clients can be configured via environment variables using the following pattern:
+Clients can be configured via environment variables using either multiline JSON (`INITIAL_CLIENTS`) or the per-field `CLIENT_<ID>_*` pattern.
+
+#### `INITIAL_CLIENTS` (multiline JSON)
+
+Set a JSON **array** of clients, a JSON **object map** keyed by client id, or a single client object. Same IDs override clients from `config.yaml` / `CLIENT_*`. Useful in Kubernetes/Compose with a `|` block:
+
+```yaml
+env:
+  - name: INITIAL_CLIENTS
+    value: |
+      [
+        {
+          "id": "webapp",
+          "secret": "super-secret-key",
+          "name": "My Web Application",
+          "redirect_uris": ["https://app.example.com/callback"],
+          "grant_types": ["authorization_code", "refresh_token"],
+          "response_types": ["code"],
+          "scopes": ["openid", "profile", "email"],
+          "token_endpoint_auth_method": "client_secret_basic"
+        },
+        {
+          "id": "pkjwt-service",
+          "grant_types": ["client_credentials"],
+          "scopes": ["openid"],
+          "token_endpoint_auth_method": "private_key_jwt",
+          "token_endpoint_auth_signing_alg": "ES256",
+          "jwks": {
+            "keys": [{
+              "kty": "EC",
+              "crv": "P-256",
+              "x": "...",
+              "y": "...",
+              "kid": "service-key",
+              "use": "sig",
+              "alg": "ES256"
+            }]
+          }
+        }
+      ]
+```
+
+Object-map form (keys become client IDs when `id` / `client_id` is omitted):
+
+```yaml
+env:
+  - name: INITIAL_CLIENTS
+    value: |
+      {
+        "webapp": {
+          "secret": "super-secret-key",
+          "redirect_uris": ["https://app.example.com/callback"],
+          "grant_types": ["authorization_code", "refresh_token"]
+        }
+      }
+```
+
+Supported fields include: `id` / `client_id`, `secret` / `client_secret`, `name`, `description`, `redirect_uris`, `grant_types`, `response_types`, `scopes`, `claims`, `audience`, `token_endpoint_auth_method`, `token_endpoint_auth_signing_alg`, `jwks`, `jwks_uri`, `public`, `force_authentication`, `force_consent`, `attestation_config`, `enabled`.
+
+#### `CLIENT_<ID>_*` pattern
 
 | Pattern | Description | Example |
 |---------|-------------|---------|
