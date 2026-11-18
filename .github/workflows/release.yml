@@ -112,7 +112,7 @@ jobs:
           labels: |
             org.opencontainers.image.title=OAuth2 Server
             org.opencontainers.image.description=Enterprise OAuth2 Authorization Server with Attestation Support
-            org.opencontainers.image.vendor=HarryKodden
+            org.opencontainers.image.vendor=EduWallet
             org.opencontainers.image.version=${{ steps.changelog.outputs.current_tag }}
             org.opencontainers.image.licenses=MIT
 

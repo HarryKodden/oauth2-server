@@ -140,13 +140,20 @@ fi
 print_info "Creating tag $NEW_VERSION..."
 git tag -a "$NEW_VERSION" -m "Release $NEW_VERSION"
 
+# origin = eduwallet (canonical). Also push to harrykodden when that remote exists.
 print_info "Pushing tag to origin..."
 git push origin "$NEW_VERSION"
 
+if git remote get-url harrykodden >/dev/null 2>&1; then
+    print_info "Pushing tag to harrykodden mirror..."
+    git push harrykodden "$NEW_VERSION"
+fi
+
 print_success "Tag $NEW_VERSION created and pushed successfully!"
-print_info "GitHub Actions will now build and publish the release."
-print_info "Check the progress at: https://github.com/$(git config --get remote.origin.url | sed 's/.*github.com[:/]\([^.]*\).*/\1/')/actions"
+print_info "GitHub Actions will now build and publish the release on the canonical repo."
+ORIGIN_SLUG=$(git remote get-url origin | sed -E 's#.*github.com[:/]([^/]+/[^/.]+)(\.git)?$#\1#')
+print_info "Check the progress at: https://github.com/${ORIGIN_SLUG}/actions"
 
 echo
 print_info "To re-publish an existing release (rebuild assets), run:"
-print_info "gh workflow run release.yml -f version=$NEW_VERSION"
+print_info "gh workflow run release.yml -R ${ORIGIN_SLUG} -f version=$NEW_VERSION"
