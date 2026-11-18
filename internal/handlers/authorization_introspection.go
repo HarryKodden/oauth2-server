@@ -159,6 +159,10 @@ func (h *AuthorizationIntrospectionHandler) ServeHTTP(w http.ResponseWriter, r *
 		return
 	}
 
+	// Same client may always introspect its own tokens (client_id is not
+	// auto-injected into registered audience). Cross-client access requires
+	// membership in the token client's audience whitelist, or privileged status.
+	isSameClient := clientID == tokenClientID
 	tokenAudiences := tokenClient.GetAudience()
 	isAudience := false
 	for _, audience := range tokenAudiences {
@@ -168,10 +172,9 @@ func (h *AuthorizationIntrospectionHandler) ServeHTTP(w http.ResponseWriter, r *
 		}
 	}
 
-	// Also allow privileged clients to introspect any token
 	isPrivileged := clientID == h.Config.Security.PrivilegedClientID
 
-	if !isAudience && !isPrivileged {
+	if !isSameClient && !isAudience && !isPrivileged {
 		h.Log.Errorf("❌ Client %s is not an audience for token client %s and is not privileged", clientID, tokenClientID)
 		http.Error(w, "Unauthorized", http.StatusForbidden)
 		return

@@ -115,6 +115,26 @@ make test-script SCRIPT=test_client_registration.sh
 - ✅ Registration access token provided for future updates
 - ✅ Registered client can successfully authenticate
 
+### `test_client_put_patch.sh` - Client PUT/PATCH Updates
+
+Validates full replace (`PUT /clients/{id}`) and selective update (`PATCH /clients/{id}`).
+
+```bash
+make test-script SCRIPT=test_client_put_patch.sh
+```
+
+**Test Flow:**
+1. **Register** a confidential client with an explicit secret
+2. **PATCH** only `redirect_uris` and confirm other fields (e.g. grant types) are preserved
+3. **PUT** a full replace including secret rotation and grant-type change
+4. **Token** with the rotated secret via `client_credentials`; old secret must fail
+5. **Cleanup** via `DELETE /clients/{id}`
+
+**Expected Results:**
+- ✅ PATCH updates only the fields present in the body
+- ✅ PUT replaces metadata and returns the new secret when rotated
+- ✅ Rotated secret authenticates; previous secret is rejected
+
 ### `test_complete_flow.sh` - Complete OAuth2 Authorization Code Flow
 
 Tests the full OAuth2 authorization code grant flow from start to finish.

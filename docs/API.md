@@ -100,6 +100,11 @@ oauth2_attestation_verification_duration_seconds{method="jwt"}
 | `/revoke` | POST | Token revocation | RFC 6749 |
 | `/userinfo` | GET | UserInfo endpoint (requires Authorization header) | OIDC Core |
 | `/register` | POST | Dynamic client registration (with audience and attestation support) |
+| `/clients` | GET | List registered client IDs |
+| `/clients/{id}` | GET | Get client details |
+| `/clients/{id}` | PUT | Full client replace (optional `client_secret` rotation) |
+| `/clients/{id}` | PATCH | Selective client update (e.g. `redirect_uris` only) |
+| `/clients/{id}` | DELETE | Delete a registered client |
 | `/claims` | GET | Claims display (interactive) |
 | `/callback` | GET | OAuth2 callback for demo |
 
@@ -155,6 +160,41 @@ curl -X POST http://localhost:8080/register \
   }'
 ```
 
+`audience` is stored as provided (plus the configured privileged client when applicable). The new client's own `client_id` is **not** inserted automatically.
+
+To supply an explicit secret on create, include `"client_secret": "..."` in the body.
+
+#### Update an existing client
+
+**PUT `/clients/{id}`** — full replace of client metadata (RFC 7592-style).  
+If `client_secret` is present, it is rotated; if omitted, the existing secret is kept.
+
+```bash
+curl -X PUT http://localhost:8080/clients/my-client-id \
+  -H "X-API-Key: your-secure-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "redirect_uris": ["https://myapp.com/callback", "https://myapp.com/cb2"],
+    "grant_types": ["authorization_code", "refresh_token"],
+    "scope": "openid profile email",
+    "token_endpoint_auth_method": "client_secret_basic",
+    "client_secret": "optional-new-secret"
+  }'
+```
+
+**PATCH `/clients/{id}`** — selective update. Only fields present in the JSON body are changed.
+
+```bash
+curl -X PATCH http://localhost:8080/clients/my-client-id \
+  -H "X-API-Key: your-secure-api-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "redirect_uris": ["https://myapp.com/callback", "https://myapp.com/cb2"]
+  }'
+```
+
+Both endpoints require the registration API to be enabled and the `X-API-Key` header.
+
 #### Client Registration with Attestation Configuration
 
 Register a client with attestation-based authentication. **Attestation-enabled clients automatically receive privileged clients in their audience for token introspection access**:
@@ -193,7 +233,7 @@ curl -X POST http://localhost:8080/register \
   "response_types": ["code"],
   "client_name": "HSM Attestation Wallet",
   "scope": "openid profile",
-  "audience": ["generated-client-id", "server-owned-client"],
+  "audience": ["server-owned-client"],
   "attestation_config": {
     "client_id": "hsm-wallet-client",
     "allowed_methods": ["attest_jwt_client_auth"],
@@ -203,7 +243,7 @@ curl -X POST http://localhost:8080/register \
 }
 ```
 
-**Note**: The `client_credentials` grant type and privileged client (`server-owned-client`) are automatically added to attestation-enabled clients for token introspection capabilities.
+**Note**: The `client_credentials` grant type and privileged client (`server-owned-client`) are automatically added for token introspection by privileged clients. The client's own `client_id` is **not** auto-added to `audience`; include it explicitly if needed.
 
 ### Complete Attestation Setup Workflow
 

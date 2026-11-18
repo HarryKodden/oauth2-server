@@ -63,6 +63,7 @@ Attestation-enabled clients automatically receive privileged clients in their au
    - Adds `client_credentials` grant type if not present
    - Includes the privileged client ID in the client's audience array
    - Logs the privileged client inclusion for audit purposes
+   - Does **not** auto-add the client's own `client_id` to `audience` (include it in the registration body if required)
 
 2. **Token Introspection**: Privileged clients can introspect tokens from attestation-enabled clients using the `/introspect` endpoint
 
@@ -92,7 +93,7 @@ curl -X POST http://localhost:8080/register \
   "client_id": "generated-client-id",
   "client_secret_expires_at": 0,
   "grant_types": ["authorization_code", "client_credentials"],
-  "audience": ["generated-client-id", "server-owned-client"],
+  "audience": ["server-owned-client"],
   "attestation_config": {
     "client_id": "generated-client-id",
     "allowed_methods": ["attest_jwt_client_auth"],

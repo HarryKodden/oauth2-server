@@ -41,7 +41,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 - Secure token rotation
 
 ### 🎯 Audience Support
-- Specify `audience` during client registration and token requests
+- Specify `audience` during client registration and token requests (own `client_id` is not auto-added)
 - Tokens include an `aud` claim (array of strings) in both the token and introspection response
 - Audience is validated on token issuance and refresh
 
@@ -154,7 +154,7 @@ A feature-rich OAuth2 and OpenID Connect server focused on API capabilities, sup
 - **Trust Anchor Management**: Dynamic upload and management of X.509 trust anchor certificates for attestation validation
 - **OpenID 4 Verifiable Credentials**: Full `issuer_state` parameter support for verifiable credential issuance flows
 - **Security**: JWT-based tokens, PKCE, HTTPS, proxy-aware, rate limiting, CORS
-- **Management**: Dynamic client registration via API (with audience support, force authentication/consent flags, and attestation configuration)
+- **Management**: Dynamic client registration via API (with audience support, force authentication/consent flags, and attestation configuration); PUT/PATCH updates on `/clients/{id}`
 - **Token Introspection**: `/introspect` endpoint returns all standard fields, including `aud` as a JSON array and attestation metadata for attested clients
 - **Token Statistics**: `/token/stats` endpoint provides statistics about issued, active, revoked, and expired tokens
 
@@ -264,6 +264,7 @@ Testing test_auth_code_pkce.sh                   ... ✅ PASSED
 Testing test_authorization_introspection.sh      ... ✅ PASSED
 Testing test_cimd_example.sh                     ... ✅ PASSED
 Testing test_cimd_registration.sh                ... ✅ PASSED
+Testing test_client_put_patch.sh                 ... ✅ PASSED
 Testing test_client_registration.sh              ... ✅ PASSED
 Testing test_complete_flow.sh                    ... ✅ PASSED
 Testing test_device_flow.sh                      ... ✅ PASSED
@@ -297,7 +298,7 @@ Testing test_userinfo.sh                         ... ✅ PASSED
 Testing test_validation.sh                       ... ✅ PASSED
 
 ════════════════════════════════════════════════════════════════
-📊 Test Summary: 38 passed, 0 failed
+📊 Test Summary: 39 passed, 0 failed
 ════════════════════════════════════════════════════════════════
 ✅ All tests passed!
 ```

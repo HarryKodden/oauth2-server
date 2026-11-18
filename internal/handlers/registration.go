@@ -289,19 +289,14 @@ func (h *RegistrationHandler) HandleRegistration(w http.ResponseWriter, r *http.
 		h.log.Printf("🔍 [REGISTRATION] Added 'openid' to scopes: %v", scopes)
 	}
 
-	// Convert audience string to array if provided
+	// Convert audience string to array if provided (client_id is not auto-added;
+	// include it explicitly when the client should be an audience of its own tokens).
 	var audience []string
 	if len(metadata.Audience) != 0 {
 		audience = metadata.Audience
 		h.log.Printf("🔍 [REGISTRATION] Using provided audience: %v", audience)
 	} else {
 		h.log.Printf("🔍 [REGISTRATION] No audience provided")
-	}
-
-	// Always add the client ID to its own audience whitelist
-	if clientID != "" && !contains(audience, clientID) {
-		audience = append(audience, clientID)
-		h.log.Printf("🔍 [REGISTRATION] Added client ID to audience: %v", audience)
 	}
 
 	// For public clients OR clients with attestation config, add the privileged client to audience for token introspection

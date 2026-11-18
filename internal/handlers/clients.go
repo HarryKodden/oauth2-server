@@ -69,7 +69,7 @@ type ClientResponse struct {
 	Public                            bool                            `json:"public,omitempty"`
 }
 
-// HandleClients handles client management requests (GET and DELETE)
+// HandleClients handles client management requests (GET, PUT, PATCH, DELETE)
 func (h *RegistrationHandler) HandleClients(w http.ResponseWriter, r *http.Request) {
 	// Parse the path to extract client ID if present
 	remaining := strings.TrimPrefix(r.URL.Path, "/clients")
@@ -89,6 +89,10 @@ func (h *RegistrationHandler) HandleClients(w http.ResponseWriter, r *http.Reque
 	switch r.Method {
 	case "GET":
 		h.handleGetClients(w, r, clientID)
+	case "PUT":
+		h.handlePutClient(w, r, clientID)
+	case "PATCH":
+		h.handlePatchClient(w, r, clientID)
 	case "DELETE":
 		h.handleDeleteClient(w, r, clientID)
 	default:
