@@ -116,6 +116,13 @@ func (h *DiscoveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			"client_secret_jwt",
 			"none",
 		},
+		// Required when introspection_endpoint_auth_methods_supported includes *_jwt
+		"introspection_endpoint_auth_signing_alg_values_supported": []string{
+			"RS256", "RS384", "RS512",
+			"ES256", "ES384", "ES512",
+			"PS256", "PS384", "PS512",
+			"HS256", "HS384", "HS512",
+		},
 
 		// PKCE support - TAKEN FROM UPSTREAM
 		"code_challenge_methods_supported": []string{
@@ -281,6 +288,11 @@ func (h *DiscoveryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// token_endpoint_auth_signing_alg_values_supported
 		if upstreamSigningAlgs, ok := upstream["token_endpoint_auth_signing_alg_values_supported"]; ok {
 			wellKnown["token_endpoint_auth_signing_alg_values_supported"] = upstreamSigningAlgs
+		}
+
+		// introspection_endpoint_auth_signing_alg_values_supported
+		if upstreamIntrospectionSigningAlgs, ok := upstream["introspection_endpoint_auth_signing_alg_values_supported"]; ok {
+			wellKnown["introspection_endpoint_auth_signing_alg_values_supported"] = upstreamIntrospectionSigningAlgs
 		}
 
 		// acr_values_supported
